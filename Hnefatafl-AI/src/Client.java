@@ -33,35 +33,22 @@ class Client {
             output   = new BufferedOutputStream(MyClient.getOutputStream());
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
 
-            while(true){
-                char cmd = 0;
+            while (true) {
+                char cmd = (char) input.read();
 
-                cmd = (char)input.read();
-                System.out.println(cmd);
-
-                switch (cmd){
-                    // Debut de la partie en joueur rouge
+                switch (cmd) {
                     case '1':
                         startAsRed(input, output, console);
                         break;
-
-                    // Debut de la partie en joueur Noir
                     case '2':
                         startAsBlack(input);
                         break;
-
-                    // Le serveur demande le prochain coup
-                    // Le message contient aussi le dernier coup joue.
                     case '3':
                         playMove(input, output, console);
                         break;
-
-                    // Le dernier coup est invalide
                     case '4':
                         invalidMove(output, console);
                         break;
-
-                    // La partie est terminée
                     case '5':
                         gameHasEnded(input, output, console);
                         break;
