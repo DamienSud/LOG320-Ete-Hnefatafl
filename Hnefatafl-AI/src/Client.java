@@ -22,19 +22,20 @@ class Client {
 
     private void run() {
 
-        Socket MyClient;
         BufferedInputStream input;
         BufferedOutputStream output;
 
+        boolean running = true;
 
-        try {
-            MyClient = new Socket(IP_ADDRESS, 8888);
+        try(Socket MyClient = new Socket(IP_ADDRESS, 8888)) {
             input    = new BufferedInputStream(MyClient.getInputStream());
             output   = new BufferedOutputStream(MyClient.getOutputStream());
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
 
-            while (true) {
+            while (running) {
                 char cmd = (char) input.read();
+
+                System.out.printf("received request type : %s\n", cmd);
 
                 switch (cmd) {
                     case '1':
@@ -51,29 +52,64 @@ class Client {
                         break;
                     case '5':
                         gameHasEnded(input, output, console);
+                        running = false;
                         break;
                 }
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             System.out.println(e);
         }
     }
 
     private void startAsRed(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("Starting as attackers (red team) : \n");
+        String s = getStringFromInputStream(input, 350);
+        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
+
+        board = new Board(s);
+        System.out.println(board);
+
+        String move = console.readLine();
+        Move myhardCodedMove = new Move(move);
+
+        computeAndSendMove(output, myhardCodedMove);
+
+        System.out.println(board);
     }
 
     private void startAsBlack(BufferedInputStream input) throws IOException {
-        // TODO 
+        System.out.println("Starting as defenders (black & king team) : \n");
+        String s = getStringFromInputStream(input, 350);
+        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
+
+        board = new Board(s);
+        System.out.println(board);
     }
 
     private void playMove(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("waiting for your turn...\n");
+        String m = getStringFromInputStream(input, 16);
+        System.out.println("Received move representation string : " + m);
+
+        if(Move.getMoveMatcherOrNull(m) == null) {
+            System.out.println("invalid move received (we have to play the first move as red team) :");
+        } else {
+            board.play(new Move(m));
+            System.out.println(board);
+        }
+
+        String move = console.readLine();
+        Move myhardCodedMove = new Move(move);
+
+        computeAndSendMove(output, myhardCodedMove);
+
+        System.out.println(board);
+
+        System.exit(1);
     }
 
     private void invalidMove(BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        throw new IllegalArgumentException("Coup invalid");
     }
 
     private void gameHasEnded(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
@@ -81,7 +117,16 @@ class Client {
     }
 
     /** Demande un coup au CPU, l'applique sur notre board, et l'envoie au serveur. */
-    private void computeAndSendMove(BufferedOutputStream output) throws IOException {
-        // TODO 
+    private void computeAndSendMove(BufferedOutputStream output, Move move) throws IOException {
+        output.write(move.toString().getBytes(), 0, move.toString().length());
+        output.flush();
+        board.play(move);
+    }
+
+    private static String getStringFromInputStream(BufferedInputStream in, int bufferSize) throws IOException {
+        byte[] aBuffer = new byte[bufferSize];
+        int contentSize = in.available();
+        in.read(aBuffer,0, contentSize);
+        return String.join("", new String(aBuffer).trim().split(" "));
     }
 }

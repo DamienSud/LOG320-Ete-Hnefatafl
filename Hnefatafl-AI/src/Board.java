@@ -1,6 +1,13 @@
 import java.util.ArrayList;
 
 public class Board {
+
+    /**
+     * 0 is EMPTY,
+     * 2 is BLACK,
+     * 4 is RED,
+     * 5 is the KING
+     */
     private static final int[] VALID_VALUES_FOR_PIECES = {0, 2, 4, 5};
     public static final int SIZE = 13;
 
@@ -13,23 +20,29 @@ public class Board {
 
         for(int i = 0; i < SIZE; i++)
             for(int j = 0; j < SIZE; j++)
-                board[i][j] = Mark.EMPTY;
+                if(isSpecialSquare(i, j)){
+                    board[i][j] = Mark.SPECIAL;
+                } else {
+                    board[i][j] = Mark.EMPTY;
+                }
     }
 
     public Board(String initialBoard){
 
         board = new Mark[SIZE][SIZE];
 
-        /*
-            i -> itere sur tous les charactere de la chaine par indice (int)
-            cpt -> ne s'incremente que lorsqu'il rencontre un charactere representant une valeur de piece valide
-        */
         for(int i = 0, cpt = 0; i < initialBoard.length(); i++){
 
             int col = cpt % SIZE;
             int row = cpt / SIZE;
 
             int convertedValue = initialBoard.charAt(i) - '0';
+
+            if(isSpecialSquare(row, col) && !Converter.pieceValueAsString(convertedValue).equals("K")){
+                board[row][col] = Mark.SPECIAL;
+                cpt++;
+                continue;
+            }
 
             if(isAllowedPieceValue(convertedValue)){
                 board[row][col] = Converter.pieceValueAsMark(convertedValue);
@@ -49,12 +62,11 @@ public class Board {
         board[move.getStartRow()][move.getStartColumn()] = Mark.EMPTY;
         board[move.getEndRow()][move.getEndColumn()] = piece;
 
-        // TODO : manage piece captures
+        // TODO : manage pieces captures
     }
 
     private boolean isSpecialSquare(int row, int col) {
-        // TODO 
-        return false;
+        return (row == CENTER && col == CENTER) || isCorner(row, col);
     }
 
     /**
@@ -66,7 +78,9 @@ public class Board {
 
     /** Le roi est capturé si ses 4 côtés sont hostiles (ennemi OU mur/case spéciale). */
     private boolean isKingCaptured(int kingRow, int kingCol) {
-        // TODO 
+        // TODO
+
+        return false;
     }
 
     public boolean isInBoard(int row, int col) {
@@ -104,10 +118,34 @@ public class Board {
         StringBuilder sb = new StringBuilder();
 
         for(int i = 0; i < SIZE; i++){
-            for(int j = 0; j < SIZE; j++)
+            for(int j = 0; j < SIZE; j++){
                 sb.append('[').append(Converter.pieceMarkAsString(board[i][j])).append(']');
+                System.out.println(i + " " + j);
+            }
 
             sb.append(System.lineSeparator());
+        }
+
+        return sb.toString();
+    }
+
+    public String getBoardAsOneLineString(String mode) {
+        StringBuilder sb = new StringBuilder();
+
+        for(int i = 0; i < SIZE; i++){
+            for(int j = 0; j < SIZE; j++)
+                switch(mode) {
+                    case "mark":
+                        sb.append(Converter.pieceMarkAsString(board[i][j]));
+                        break;
+                    case "int":
+                        sb.append(Converter.pieceMarkAsInt(board[i][j]));
+                        break;
+                    default:
+                        sb.append("x"); // placeholder
+                        break;
+                }
+
         }
 
         return sb.toString();
