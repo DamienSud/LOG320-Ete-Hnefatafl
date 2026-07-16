@@ -66,13 +66,15 @@ public class Board {
         board[move.getStartRow()][move.getStartColumn()] = Mark.EMPTY;
         board[move.getEndRow()][move.getEndColumn()] = piece;
 
-        // TODO : manage pieces captures
+        this.checkCaptures(move, piece);
     }
 
     /**
      * Vérifie et applique les captures déclenchées par la pièce arrivée en (row, col).
      */
-    private void checkCaptures(int row, int col, Mark movedPiece) {
+    private void checkCaptures(Move move, Mark movedPiece) {
+        int endRow = move.getEndRow(), endCol = move.getEndColumn();
+
 
     }
 
@@ -88,8 +90,6 @@ public class Board {
 
     /** Le roi est capturé si ses 4 côtés sont hostiles (ennemi OU mur/case spéciale). */
     private boolean isKingCaptured(int kingRow, int kingCol) {
-
-        //if()
 
         return false;
     }
@@ -156,5 +156,49 @@ public class Board {
         Board newBoard = new Board();
         for (int i = 0; i < this.board.length; i++) System.arraycopy(this.board[i], 0, newBoard.board[i], 0, this.board[i].length);
         return newBoard;
+    }
+}
+
+/**
+ * Wrapper to act on 3x3 sub array of a bigger board
+ */
+class SubBoard {
+
+    private final static int SIZE = 3;
+
+    public enum Modes {
+        Center,
+        UpLeft,
+        UpRight,
+        DownLeft,
+        DownRight
+    }
+
+    private final Mark[][] view;
+    private final int startRow;
+    private final int startCol;
+
+    public SubBoard(Mark[][] board, int row, int col, SubBoard.Modes mode) {
+        this.startRow = row;
+        this.startCol = col;
+
+        //TODO fill that shit up
+        switch(mode) {
+            case Center -> {
+
+            }
+            case UpLeft -> {
+
+            }
+            case UpRight -> {
+
+            }
+            case DownLeft -> {
+
+            }
+            case DownRight -> {
+
+            }
+        }
     }
 }
