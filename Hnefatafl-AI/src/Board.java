@@ -57,6 +57,10 @@ public class Board {
         return false;
     }
 
+    /**
+     * this method suppose a valid move and does NOT check for validity (danger of desynchronizing with server)
+     * @param move
+     */
     public void play(Move move){
         Mark piece = board[move.getStartRow()][move.getStartColumn()];
         board[move.getStartRow()][move.getStartColumn()] = Mark.EMPTY;
@@ -65,27 +69,27 @@ public class Board {
         // TODO : manage pieces captures
     }
 
-    private boolean isSpecialSquare(int row, int col) {
-        return (row == CENTER && col == CENTER) || isCorner(row, col);
-    }
-
     /**
      * Vérifie et applique les captures déclenchées par la pièce arrivée en (row, col).
      */
     private void checkCaptures(int row, int col, Mark movedPiece) {
-        // TODO 
+
+    }
+
+    private boolean isSpecialSquare(int row, int col) { return isThrone(row, col) || isCorner(row, col); }
+
+    private boolean isThrone(int row, int col) { return row == CENTER && col == CENTER; }
+
+    private boolean isCorner(int row, int col) { return (row == 0 || row == SIZE - 1) && (col == 0 || col == SIZE - 1); }
+
+    public boolean isInBoard(int row, int col) {
+        return row > 0 && row < SIZE && col > 0 && col < SIZE;
     }
 
     /** Le roi est capturé si ses 4 côtés sont hostiles (ennemi OU mur/case spéciale). */
     private boolean isKingCaptured(int kingRow, int kingCol) {
-        // TODO
 
-        return false;
-    }
-
-    public boolean isInBoard(int row, int col) {
-
-        // TODO 
+        //if()
 
         return false;
     }
@@ -109,10 +113,6 @@ public class Board {
         return null;
     }
 
-    private boolean isCorner(int row, int col) {
-        return (row == 0 || row == SIZE - 1) && (col == 0 || col == SIZE - 1);
-    }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -120,7 +120,6 @@ public class Board {
         for(int i = 0; i < SIZE; i++){
             for(int j = 0; j < SIZE; j++){
                 sb.append('[').append(Converter.pieceMarkAsString(board[i][j])).append(']');
-                System.out.println(i + " " + j);
             }
 
             sb.append(System.lineSeparator());
@@ -142,7 +141,7 @@ public class Board {
                         sb.append(Converter.pieceMarkAsInt(board[i][j]));
                         break;
                     default:
-                        sb.append("x"); // placeholder
+                        sb.append("x"); // placeholder, should never happend
                         break;
                 }
 

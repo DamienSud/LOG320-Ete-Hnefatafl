@@ -3,5 +3,6 @@ public enum Mark {
     BLACK,
     RED,
     KING,
-    SPECIAL
+    SPECIAL,
+    OUT
 }

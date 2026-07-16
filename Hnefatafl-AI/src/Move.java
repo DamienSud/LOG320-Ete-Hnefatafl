@@ -4,7 +4,6 @@ import java.util.regex.*;
 /**
  * Represent a move with it's starting end ending position with the local indexing standard.
  *
- *
  */
 public class Move {
 
@@ -82,6 +81,10 @@ public class Move {
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(move);
+
+        System.out.println("debug getMoveMatcherOrNull");
+        System.out.println(move);
+        System.out.println(matcher);
 
         if(!matcher.matches()) return null;
 

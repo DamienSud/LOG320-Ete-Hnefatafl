@@ -69,6 +69,8 @@ class Client {
         board = new Board(s);
         System.out.println(board);
 
+        System.out.print("play a move : ");
+
         String move = console.readLine();
         Move myhardCodedMove = new Move(move);
 
@@ -98,14 +100,14 @@ class Client {
             System.out.println(board);
         }
 
+        System.out.print("play a move : ");
+
         String move = console.readLine();
         Move myhardCodedMove = new Move(move);
 
         computeAndSendMove(output, myhardCodedMove);
 
         System.out.println(board);
-
-        System.exit(1);
     }
 
     private void invalidMove(BufferedOutputStream output, BufferedReader console) throws IOException {

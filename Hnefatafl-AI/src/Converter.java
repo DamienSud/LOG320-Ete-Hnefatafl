@@ -90,7 +90,7 @@ public class Converter {
      */
     public static Mark getOpponent(Mark piece){
         return switch(piece){
-            case EMPTY,SPECIAL -> Mark.EMPTY;
+            case EMPTY, SPECIAL, OUT -> Mark.EMPTY;
             case BLACK, KING -> Mark.RED;
             case RED -> Mark.BLACK;
         };
@@ -120,14 +120,13 @@ public class Converter {
      */
     public static String pieceMarkAsString(Mark value){
 
-        System.out.println("value : " + value);
-
         return switch(value){
             case EMPTY -> "-";
             case BLACK -> "B";
             case RED -> "R";
             case KING -> "K";
             case SPECIAL -> "X";
+            case OUT -> "O";
         };
     }
 
@@ -143,6 +142,7 @@ public class Converter {
             case BLACK -> 2;
             case RED -> 4;
             case KING -> 5;
+            case OUT -> -1;
         };
     }
 
