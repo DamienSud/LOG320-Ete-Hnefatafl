@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class Board {
 
@@ -13,8 +14,7 @@ public class Board {
 
     private static final int CENTER = SIZE / 2;
 
-    //TODO : make private
-    public final Mark[][] board;
+    private final Mark[][] board;
 
     public Board(){
         board = new Mark[SIZE][SIZE];
@@ -75,8 +75,30 @@ public class Board {
      */
     private void checkCaptures(Move move, Mark movedPiece) {
         int endRow = move.getEndRow(), endCol = move.getEndColumn();
+        Mark opponentPiece = Converter.getOpponent(movedPiece);
 
+        SubBoard sub = new SubBoard(this.board, endRow, endCol);
 
+        System.out.println("debug hasNext and next");
+
+        while(sub.hasNext()) {
+            int currRow = sub.getIterRow(), currCol = sub.getIterCol();
+
+            Mark piece = sub.next();
+
+            boolean isOpponent = piece == opponentPiece;
+            boolean isSelf = (currRow == 1 && currCol == 1);
+
+            String pieceAsStr = Converter.pieceMarkAsString(piece);
+
+            if(isOpponent){
+                System.out.printf("direction (%d, %d) : %s (opponent)\n", currRow - 1, currCol - 1, pieceAsStr);
+            } else if (isSelf) {
+                System.out.printf("direction (%d, %d) : %s (self)\n", 0, 0, pieceAsStr);
+            } else {
+                System.out.printf("direction (%d, %d) : %s\n", currRow - 1, currCol - 1, pieceAsStr);
+            }
+        }
     }
 
     private boolean isSpecialSquare(int row, int col) { return isThrone(row, col) || isCorner(row, col); }
@@ -86,11 +108,17 @@ public class Board {
     private boolean isCorner(int row, int col) { return (row == 0 || row == SIZE - 1) && (col == 0 || col == SIZE - 1); }
 
     public boolean isInBoard(int row, int col) {
-        return row > 0 && row < SIZE && col > 0 && col < SIZE;
+        return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
 
     /** Le roi est capturé si ses 4 côtés sont hostiles (ennemi OU mur/case spéciale). */
     private boolean isKingCaptured(int kingRow, int kingCol) {
+
+        return false;
+    }
+
+    /** Une piece classique est capturé si 2 de ses côtés sont hostiles (ennemi OU case spéciale). */
+    private boolean isPieceCaptured(int kingRow, int kingCol) {
 
         return false;
     }
@@ -163,13 +191,18 @@ public class Board {
 /**
  * Wrapper to act on 3x3 sub array of a bigger board
  */
-class SubBoard {
+class SubBoard implements Iterator<Mark> {
 
     public final static int SIZE = 3;
 
     private final Mark[][] ref;
     private final int startRow; // row of the upper left corner
     private final int startCol; // col of the upper left corner
+
+    /* following are for iterator's method */
+    private int IterRow = 0;
+    private int IterCol = 0;
+    /* ----------------------------------- */
 
     public SubBoard(Mark[][] board, int row, int col) {
         this.ref = board;
@@ -239,5 +272,37 @@ class SubBoard {
         }
 
         return sb.toString();
+    }
+
+    @Override
+    public boolean hasNext() {
+        return this.IterRow < SIZE &&  this.IterCol < SIZE;
+    }
+
+    @Override
+    public Mark next() {
+        int currX = this.IterRow, currY = this.IterCol;
+
+        if(IterCol == SIZE - 1) {
+            this.IterCol = 0;
+            this.IterRow++;
+        } else {
+            this.IterCol++;
+        }
+
+        return get(currX, currY);
+    }
+
+    public void resetIterator() {
+        this.IterRow = 0;
+        this.IterCol = 0;
+    }
+
+    public int getIterRow() {
+        return this.IterRow;
+    }
+
+    public int getIterCol() {
+        return this.IterCol;
     }
 }

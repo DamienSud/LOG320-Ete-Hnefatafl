@@ -111,11 +111,11 @@ class Client {
     }
 
     private void invalidMove(BufferedOutputStream output, BufferedReader console) throws IOException {
-        throw new IllegalArgumentException("Coup invalid");
+        throw new IllegalArgumentException("invalid Move");
     }
 
     private void gameHasEnded(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("End of the game");
     }
 
     /** Demande un coup au CPU, l'applique sur notre board, et l'envoie au serveur. */

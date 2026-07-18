@@ -4,5 +4,6 @@ public enum Mark {
     RED,
     KING,
     SPECIAL,
-    OUT
+    OUT,
+    ERROR
 }
