@@ -77,6 +77,26 @@ class Client {
         computeAndSendMove(output, myhardCodedMove);
 
         System.out.println(board);
+
+        s = board.getBoardAsOneLineString("int");
+
+        /**
+         * testing subboard
+         */
+
+        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
+
+        SubBoard sub = new SubBoard(board.board, 6, 2);
+
+        System.out.println(sub);
+
+        sub.set(1, 1, Mark.KING);
+
+        System.out.println(sub);
+
+        System.out.println(board);
+
+        System.exit(1);
     }
 
     private void startAsBlack(BufferedInputStream input) throws IOException {

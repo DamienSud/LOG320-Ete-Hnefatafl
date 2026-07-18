@@ -13,7 +13,8 @@ public class Board {
 
     private static final int CENTER = SIZE / 2;
 
-    private final Mark[][] board;
+    //TODO : make private
+    public final Mark[][] board;
 
     public Board(){
         board = new Mark[SIZE][SIZE];
@@ -164,41 +165,79 @@ public class Board {
  */
 class SubBoard {
 
-    private final static int SIZE = 3;
+    public final static int SIZE = 3;
 
-    public enum Modes {
-        Center,
-        UpLeft,
-        UpRight,
-        DownLeft,
-        DownRight
+    private final Mark[][] ref;
+    private final int startRow; // row of the upper left corner
+    private final int startCol; // col of the upper left corner
+
+    public SubBoard(Mark[][] board, int row, int col) {
+        this.ref = board;
+
+        if (this.outOfBoard(row, col))
+            throw new IllegalArgumentException("You can't create a subboard view from outside of the board");
+
+        /**
+         * Takes the upper left corner's coordinate
+         */
+        this.startRow = row - 1;
+        this.startCol = col - 1;
     }
 
-    private final Mark[][] view;
-    private final int startRow;
-    private final int startCol;
+    public Mark get(int row, int col) {
+        if(this.outOfSubBoard(row, col))
+            throw new IllegalArgumentException("You can't reach a value outside of the subboard");
 
-    public SubBoard(Mark[][] board, int row, int col, SubBoard.Modes mode) {
-        this.startRow = row;
-        this.startCol = col;
+        return this.getValueOrOUT(row, col);
+    }
 
-        //TODO fill that shit up
-        switch(mode) {
-            case Center -> {
+    private Mark getValueOrOUT(int row, int col) {
+        int absRow = row + this.startRow;
+        int absCol = col + this.startCol;
 
+        if(this.outOfBoard(row, col))
+            return Mark.OUT;
+
+        return ref[absRow][absCol];
+    }
+
+    public boolean outOfBoard(int row, int col) {
+        int absRow = row + this.startRow;
+        int absCol = col + this.startCol;
+
+        return absRow >= this.ref.length || absCol >= this.ref[0].length || absRow < 0 || absCol < 0;
+    }
+
+    private boolean outOfSubBoard(int row, int col) {
+
+        return row >= SIZE || col >= SIZE || row < 0 || col < 0;
+    }
+
+    public void set(int row, int col, Mark mark) {
+        if(this.outOfSubBoard(row, col))
+            throw new IllegalArgumentException("You can't reach a value outside of the subboard");
+
+        if (this.outOfBoard(row, col))
+            throw new IllegalArgumentException("You can't edit a subboard value that is outside of the board");
+
+        int absRow = row + this.startRow;
+        int absCol = col + this.startCol;
+
+        this.ref[absRow][absCol] = mark;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        for(int i = 0; i < SIZE; i++){
+            for(int j = 0; j < SIZE; j++){
+                sb.append('[').append(Converter.pieceMarkAsString(this.get(i, j))).append(']');
             }
-            case UpLeft -> {
 
-            }
-            case UpRight -> {
-
-            }
-            case DownLeft -> {
-
-            }
-            case DownRight -> {
-
-            }
+            sb.append(System.lineSeparator());
         }
+
+        return sb.toString();
     }
 }
