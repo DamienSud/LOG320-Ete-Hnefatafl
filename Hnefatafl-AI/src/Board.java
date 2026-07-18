@@ -79,24 +79,26 @@ public class Board {
 
         SubBoard sub = new SubBoard(this.board, endRow, endCol);
 
-        System.out.println("debug hasNext and next");
-
         while(sub.hasNext()) {
-            int currRow = sub.getIterRow(), currCol = sub.getIterCol();
+            int currIterRow = sub.getIterRow(), currIterCol = sub.getIterCol();
+            int dirRow = currIterRow - 1, dirCol = currIterCol - 1;
 
             Mark piece = sub.next();
 
-            boolean isOpponent = piece == opponentPiece;
-            boolean isSelf = (currRow == 1 && currCol == 1);
-
             String pieceAsStr = Converter.pieceMarkAsString(piece);
 
-            if(isOpponent){
-                System.out.printf("direction (%d, %d) : %s (opponent)\n", currRow - 1, currCol - 1, pieceAsStr);
-            } else if (isSelf) {
+            if(piece == opponentPiece){
+                System.out.printf("direction (%d, %d) : %s (opponent)\n", dirRow, dirCol, pieceAsStr);
+
+                int absRow = endRow + dirRow, absCol = endCol + dirCol;
+                if(this.isCaptured(absRow, absCol)) {
+                    this.board[absRow][absCol] = Mark.EMPTY;
+                }
+
+            } else if (currIterRow == 1 && currIterCol == 1) {
                 System.out.printf("direction (%d, %d) : %s (self)\n", 0, 0, pieceAsStr);
             } else {
-                System.out.printf("direction (%d, %d) : %s\n", currRow - 1, currCol - 1, pieceAsStr);
+                System.out.printf("direction (%d, %d) : %s\n", dirRow, dirCol, pieceAsStr);
             }
         }
     }
@@ -111,16 +113,10 @@ public class Board {
         return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
 
-    /** Le roi est capturé si ses 4 côtés sont hostiles (ennemi OU mur/case spéciale). */
-    private boolean isKingCaptured(int kingRow, int kingCol) {
+    private boolean isCaptured(int row, int col) {
+        SubBoard sub = new SubBoard(this.board, row, col);
 
-        return false;
-    }
-
-    /** Une piece classique est capturé si 2 de ses côtés sont hostiles (ennemi OU case spéciale). */
-    private boolean isPieceCaptured(int kingRow, int kingCol) {
-
-        return false;
+        return sub.isCaptured(this.board[row][col]);
     }
 
     public ArrayList<Move> getPossibleMoves(Mark player) {
@@ -134,12 +130,6 @@ public class Board {
         // TODO 
         
         return 0;
-    }
-
-    private int[] findKing() {
-        // TODO 
-        
-        return null;
     }
 
     @Override
@@ -257,6 +247,28 @@ class SubBoard implements Iterator<Mark> {
         int absCol = col + this.startCol;
 
         this.ref[absRow][absCol] = mark;
+    }
+
+    // TODO : get over with the isCaptured method
+    public boolean isCaptured(Mark piece) {
+        Mark opponent = Converter.getOpponent(piece);
+
+        switch(piece) {
+            case KING -> {
+                boolean captured = true;
+                int[][] dangers = {{0, 1}, {1, 0}, {1, 2}, {2, 1}};
+                for(int[] danger : dangers) {
+                    if(this.get(danger[0], danger[1]) == opponent) {
+
+                    }
+                }
+            }
+            case RED, BLACK -> {
+
+            }
+        }
+
+        return false;
     }
 
     @Override
