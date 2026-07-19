@@ -14,8 +14,7 @@ public class Board {
 
     private static final int CENTER = SIZE / 2;
 
-    // TODO make private
-    public final Mark[][] board;
+    private final Mark[][] board;
 
     private int quantityRED;
     private int quantityBLACK;
