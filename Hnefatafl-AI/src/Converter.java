@@ -93,7 +93,6 @@ public class Converter {
             case EMPTY, SPECIAL, OUT -> Mark.EMPTY;
             case BLACK, KING -> Mark.RED;
             case RED -> Mark.BLACK;
-            case ERROR -> Mark.ERROR;
         };
     }
 
@@ -128,7 +127,6 @@ public class Converter {
             case KING -> "K";
             case SPECIAL -> "X";
             case OUT -> "O";
-            case ERROR -> "E";
         };
     }
 
@@ -145,7 +143,6 @@ public class Converter {
             case RED -> 4;
             case KING -> 5;
             case OUT -> -1;
-            case ERROR -> -2;
         };
     }
 

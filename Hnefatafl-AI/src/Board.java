@@ -14,7 +14,11 @@ public class Board {
 
     private static final int CENTER = SIZE / 2;
 
-    private final Mark[][] board;
+    // TODO make private
+    public final Mark[][] board;
+
+    private int quantityRED;
+    private int quantityBLACK;
 
     public Board(){
         board = new Mark[SIZE][SIZE];
@@ -39,6 +43,7 @@ public class Board {
 
             int convertedValue = initialBoard.charAt(i) - '0';
 
+            /* if the king is not on a special square, display a SPECIAL */
             if(isSpecialSquare(row, col) && !Converter.pieceValueAsString(convertedValue).equals("K")){
                 board[row][col] = Mark.SPECIAL;
                 cpt++;
@@ -46,7 +51,14 @@ public class Board {
             }
 
             if(isAllowedPieceValue(convertedValue)){
+
                 board[row][col] = Converter.pieceValueAsMark(convertedValue);
+
+                switch(board[row][col]){
+                    case BLACK, KING -> quantityBLACK++;
+                    case RED -> quantityRED++;
+                }
+
                 cpt++;
             }
         }
@@ -64,7 +76,11 @@ public class Board {
      */
     public void play(Move move){
         Mark piece = board[move.getStartRow()][move.getStartColumn()];
-        board[move.getStartRow()][move.getStartColumn()] = Mark.EMPTY;
+        if(this.isSpecialSquare(move.getStartRow(), move.getStartColumn())) {
+            board[move.getStartRow()][move.getStartColumn()] = Mark.SPECIAL;
+        } else {
+            board[move.getStartRow()][move.getStartColumn()] = Mark.EMPTY;
+        }
         board[move.getEndRow()][move.getEndColumn()] = piece;
 
         this.checkCaptures(move, piece);
@@ -79,6 +95,9 @@ public class Board {
 
         SubBoard sub = new SubBoard(this.board, endRow, endCol);
 
+        System.out.println("local move : ");
+        System.out.println(sub);
+
         while(sub.hasNext()) {
             int currIterRow = sub.getIterRow(), currIterCol = sub.getIterCol();
             int dirRow = currIterRow - 1, dirCol = currIterCol - 1;
@@ -90,17 +109,27 @@ public class Board {
             if(piece == opponentPiece){
                 System.out.printf("direction (%d, %d) : %s (opponent)\n", dirRow, dirCol, pieceAsStr);
 
-                int absRow = endRow + dirRow, absCol = endCol + dirCol;
-                if(this.isCaptured(absRow, absCol)) {
-                    this.board[absRow][absCol] = Mark.EMPTY;
-                }
+                int[][] posistionsInReach = {{0, 1}, {1, 0}, {1, 2}, {2, 1}};
 
-            } else if (currIterRow == 1 && currIterCol == 1) {
-                System.out.printf("direction (%d, %d) : %s (self)\n", 0, 0, pieceAsStr);
-            } else {
-                System.out.printf("direction (%d, %d) : %s\n", dirRow, dirCol, pieceAsStr);
+                for(int[] position : posistionsInReach) {
+                    if(currIterRow == position[0] && currIterCol == position[1]){
+                        System.out.printf("Checking capture for opponent piece on direction (%d, %d)\n", dirRow, dirCol);
+
+                        // check capture of that opponent piece
+                        int absRow = endRow + dirRow, absCol = endCol + dirCol;
+                        if(this.isCaptured(absRow, absCol)) {
+                            switch(board[absRow][absCol]){
+                                case BLACK, KING -> quantityBLACK--;
+                                case RED -> quantityRED--;
+                            }
+                            this.board[absRow][absCol] = Mark.EMPTY;
+                        }
+                    }
+                }
             }
         }
+
+        System.out.println("\n");
     }
 
     private boolean isSpecialSquare(int row, int col) { return isThrone(row, col) || isCorner(row, col); }
@@ -109,25 +138,72 @@ public class Board {
 
     private boolean isCorner(int row, int col) { return (row == 0 || row == SIZE - 1) && (col == 0 || col == SIZE - 1); }
 
+    private boolean isCaptured(int row, int col) {
+        SubBoard sub = new SubBoard(this.board, row, col);
+        return sub.isCaptured();
+    }
+
+    public ArrayList<Move> getPossibleMoves(Mark player) {
+        ArrayList<Move> moves = new ArrayList<>();
+
+        for (int row = 0; row < SIZE; row++) {
+            for (int col = 0; col < SIZE; col++) {
+                Mark piece = board[row][col];
+                if (belongsToPlayer(piece, player)) {
+                    addMovesForPiece(row, col, piece, moves);
+                }
+            }
+        }
+
+        System.out.printf("%d moves found.\n", moves.size());
+        return moves;
+    }
+
+    private boolean belongsToPlayer(Mark piece, Mark player) {
+        return switch(player){
+            case BLACK, KING -> piece == Mark.BLACK || piece == Mark.KING;
+            case RED -> piece == Mark.RED;
+            default -> false;
+        };
+    }
+
+    private static final int[][] DIRECTIONS = {
+            {-1, 0}, {1, 0}, {0, -1}, {0, 1}
+    };
+
+    private void addMovesForPiece(int row, int col, Mark piece, ArrayList<Move> moves) {
+        boolean isKing = (piece == Mark.KING);
+
+        for (int[] dir : DIRECTIONS) {
+            int r = row + dir[0];
+            int c = col + dir[1];
+
+            while (isInBoard(r, c) && canGoThrough(r, c)) {
+                if (isSpecialSquare(r, c)) {
+                    if (isKing) { // only a KING can stop on a SPECIAL slot
+                        moves.add(new Move(row, col, r, c, "local"));
+                    }
+                } else {
+                    moves.add(new Move(row, col, r, c, "local"));
+                }
+                r += dir[0];
+                c += dir[1];
+            }
+        }
+    }
+
+    /** EMPTY slot or unused SPECIAL slot (no king on it) */
+    private boolean canGoThrough(int row, int col) {
+        Mark m = board[row][col];
+        return m == Mark.EMPTY || m == Mark.SPECIAL;
+    }
+
     public boolean isInBoard(int row, int col) {
         return row >= 0 && row < SIZE && col >= 0 && col < SIZE;
     }
 
-    private boolean isCaptured(int row, int col) {
-        SubBoard sub = new SubBoard(this.board, row, col);
-
-        return sub.isCaptured(this.board[row][col]);
-    }
-
-    public ArrayList<Move> getPossibleMoves(Mark player) {
-        // TODO 
-
-        ArrayList<Move> moves = new ArrayList<>();
-        return moves;
-    }
-
     public int evaluate(Mark player) {
-        // TODO 
+        // TODO
         
         return 0;
     }
@@ -138,7 +214,7 @@ public class Board {
 
         for(int i = 0; i < SIZE; i++){
             for(int j = 0; j < SIZE; j++){
-                sb.append('[').append(Converter.pieceMarkAsString(board[i][j])).append(']');
+                sb.append("[").append(Converter.pieceMarkAsString(board[i][j])).append("]");
             }
 
             sb.append(System.lineSeparator());
@@ -249,22 +325,52 @@ class SubBoard implements Iterator<Mark> {
         this.ref[absRow][absCol] = mark;
     }
 
-    // TODO : get over with the isCaptured method
-    public boolean isCaptured(Mark piece) {
-        Mark opponent = Converter.getOpponent(piece);
+    public boolean isCaptured() {
+        Mark piece = this.get(1, 1);
 
         switch(piece) {
             case KING -> {
-                boolean captured = true;
+                System.out.println("Is king Captured?");
+
                 int[][] dangers = {{0, 1}, {1, 0}, {1, 2}, {2, 1}};
                 for(int[] danger : dangers) {
-                    if(this.get(danger[0], danger[1]) == opponent) {
-
-                    }
+                    if(
+                            this.get(danger[0], danger[1]) != Mark.RED
+                            && this.get(danger[0], danger[1]) != Mark.OUT
+                            && this.get(danger[0], danger[1]) != Mark.SPECIAL
+                    ) return false;
                 }
+                return true;
             }
             case RED, BLACK -> {
+                System.out.printf("Is %s Captured?\n", Converter.pieceMarkAsString(piece));
+                Mark opponent = Converter.getOpponent(piece);
+                boolean captured = true;
 
+                int[][] vertical = {{0, 1}, {2, 1}};
+                int[][] horizontal = {{1, 0}, {1, 2}};
+
+                /* check for vertical capture */
+                for(int[] danger : vertical) {
+                    if(
+                            this.get(danger[0], danger[1]) != opponent
+                            && this.get(danger[0], danger[1]) != Mark.SPECIAL
+                    ) captured = false;
+                }
+
+                if(captured) return true;
+
+                captured = true;
+
+                /* check for horizontal capture */
+                for(int[] danger : horizontal) {
+                    if(
+                            this.get(danger[0], danger[1]) != opponent
+                            && this.get(danger[0], danger[1]) != Mark.SPECIAL
+                    ) captured = false;
+                }
+
+                if(captured) return true;
             }
         }
 
@@ -277,7 +383,8 @@ class SubBoard implements Iterator<Mark> {
 
         for(int i = 0; i < SIZE; i++){
             for(int j = 0; j < SIZE; j++){
-                sb.append('[').append(Converter.pieceMarkAsString(this.get(i, j))).append(']');
+                Mark piece = this.get(i, j);
+                sb.append("[").append(Converter.pieceMarkAsString(piece)).append("]");
             }
 
             sb.append(System.lineSeparator());

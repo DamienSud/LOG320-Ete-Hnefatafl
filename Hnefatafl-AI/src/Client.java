@@ -85,13 +85,31 @@ class Client {
         System.out.printf("Received board (as a one line string): \n%s\n\n", s);
 
         board = new Board(s);
+        //System.out.println(board);
+
+        board = new Board("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+        SubBoard sub = new SubBoard(board.board, 6, 6);
+
+        sub.set(1, 0, Mark.RED);
+
+        sub = new SubBoard(board.board, 6, 5);
+        sub.set(0, 1, Mark.BLACK);
+        sub.set(2, 1, Mark.BLACK);
+        sub.set(1, 0, Mark.RED);
+
+        System.out.println(sub);
         System.out.println(board);
+        System.out.println(sub.isCaptured());
+
+        board.getPossibleMoves(Mark.RED);
+
+        System.exit(1);
     }
 
     private void playMove(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
         System.out.println("waiting for your turn...\n");
         String m = getStringFromInputStream(input, 16);
-        System.out.println("Received move representation string : " + m);
+        System.out.printf("Received move representation string : %s\n\n", m);
 
         if(Move.getMoveMatcherOrNull(m) == null) {
             System.out.println("invalid move received (we have to play the first move as red team) :");

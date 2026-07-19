@@ -81,8 +81,6 @@ public class Move {
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(move);
-        System.out.println(move);
-        System.out.println(matcher);
 
         if(!matcher.matches()) return null;
 
