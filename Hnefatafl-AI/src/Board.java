@@ -391,6 +391,7 @@ class SubBoard implements Iterator<Mark> {
                             if(
                                     !Board.isOpponent(this.get(danger[0], danger[1]), attakedPiece)
                                     && this.get(danger[0], danger[1]) != Mark.SPECIAL
+                                    && !Board.isThrone(this.initialRow + danger[0] - 1, this.initialCol + danger[1] - 1)
                             ) return false;
                         }
                         System.out.printf("%s is horizontaly captured...\n\n", Converter.pieceMarkAsString(attakedPiece));
