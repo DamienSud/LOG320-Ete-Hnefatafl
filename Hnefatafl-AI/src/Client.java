@@ -1,11 +1,13 @@
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
-
+import java.util.Random;
 
 class Client {
 
     public static String IP_ADDRESS = "localhost";
+    private final boolean MANUAL_MODE = false;
+    private final int DEPTH = 2;
 
     public static void main(String[] args) {
         Client cl = new Client();
@@ -52,7 +54,7 @@ class Client {
                         break;
                     case '5':
                         gameHasEnded(input, output, console);
-                        running = false;
+                        //running = false;
                         break;
                 }
             }
@@ -69,12 +71,9 @@ class Client {
         board = new Board(s);
         System.out.println(board);
 
-        System.out.print("play a move : ");
+        cpu = new CPUPlayer(Mark.RED);
 
-        String move = console.readLine();
-        Move myhardCodedMove = new Move(move);
-
-        computeAndSendMove(output, myhardCodedMove);
+        computeAndSendMove(output, console);
 
         System.out.println(board);
     }
@@ -86,6 +85,8 @@ class Client {
 
         board = new Board(s);
         System.out.println(board);
+
+        cpu = new CPUPlayer(Mark.BLACK);
     }
 
     private void playMove(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
@@ -100,12 +101,7 @@ class Client {
             System.out.println(board);
         }
 
-        System.out.print("play a move : ");
-
-        String move = console.readLine();
-        Move myhardCodedMove = new Move(move);
-
-        computeAndSendMove(output, myhardCodedMove);
+        computeAndSendMove(output, console);
 
         System.out.println(board);
     }
@@ -115,14 +111,41 @@ class Client {
     }
 
     private void gameHasEnded(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        System.out.println("End of the game");
+        System.out.println("End of the game.\nResult : \n");
+
+        if(board.isKingCaptured()) {
+            System.out.println("RED team won");
+        } else if(board.isKingEscaped()) {
+            System.out.println("BLACK team won");
+        } else {
+            System.out.println("game is a draw");
+        }
     }
 
     /** Demande un coup au CPU, l'applique sur notre board, et l'envoie au serveur. */
-    private void computeAndSendMove(BufferedOutputStream output, Move move) throws IOException {
-        output.write(move.toString().getBytes(), 0, move.toString().length());
+    private void computeAndSendMove(BufferedOutputStream output, BufferedReader console) throws IOException {
+        Move move_obj = null;
+
+        if(MANUAL_MODE) {
+            System.out.print("(MANUAL MODE ACTIVE) play a move : ");
+            String move_str = console.readLine();
+            move_obj = new Move(move_str);
+        } else {
+            ArrayList<Move> bestMoves = cpu.getNextMoveAB(board, DEPTH);
+
+            if (bestMoves == null || bestMoves.isEmpty()) {
+                throw new IllegalStateException("no best moves found, game is stuck...");
+            }
+
+            int index = new Random().nextInt(bestMoves.size());
+            move_obj = bestMoves.get(index);
+        }
+
+        output.write(move_obj.toString().getBytes(), 0, move_obj.toString().length());
         output.flush();
-        board.play(move);
+
+        System.out.printf("move played : %s\n\n",  move_obj.toString());
+        board.play(move_obj);
     }
 
     private static String getStringFromInputStream(BufferedInputStream in, int bufferSize) throws IOException {

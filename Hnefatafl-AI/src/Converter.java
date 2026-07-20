@@ -149,4 +149,12 @@ public class Converter {
     public static String pieceValueAsString(int value) {
         return pieceMarkAsString(pieceValueAsMark(value));
     }
+
+    public static String watchSideAsString(SubBoard.WatchMode mode) {
+        return switch(mode) {
+            case FULL -> "FULL";
+            case HORIZONTAL ->  "HORIZONTAL";
+            case VERTICAL ->  "VERTICAL";
+        };
+    }
 }
