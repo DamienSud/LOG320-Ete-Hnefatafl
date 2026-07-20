@@ -1,10 +1,11 @@
 public class Converter {
     /**
-     * Il existe sans doute une maniere de faire ca plus proprement avec un one liner et le code des characteres mais on verra ca plus tard
+     * takes a col index (local indexing) and gives it's corresponding column letter
+     *
      * @param index
      * @return
      */
-    public static String indexToColLetter(int index) {
+    public static String ConvertLocalIndexToColLetter(int index) {
         return switch(index) {
             case 0 -> "A";
             case 1 -> "B";
@@ -19,16 +20,17 @@ public class Converter {
             case 10 -> "K";
             case 11 -> "L";
             case 12 -> "M";
-            default -> "";
+            default -> throw new IllegalArgumentException("invalid index");
         };
     }
 
     /**
-     * Il existe sans doute une maniere de faire ca plus proprement avec un one liner et le code des characteres mais on verra ca plus tard
+     * Takes a col letter and gives it's corresponding local index
+     *
      * @param letter
      * @return
      */
-    public static int colLetterToLocalIndex(String letter) {
+    public static int ConvertColletterToLocalIndex(String letter) {
         return switch(letter) {
             case "A" -> 0;
             case "B" -> 1;
@@ -43,56 +45,116 @@ public class Converter {
             case "K" -> 10;
             case "L" -> 11;
             case "M" -> 12;
-            default -> -1;
+            default -> throw new IllegalArgumentException("invalid index");
         };
     }
 
     /**
      * Fait correspondre l'indexage des lignes du programme en local avec celui du serveur
+     *
+     * Le serveur considere la ligne 1 comme la derniere ligne (celle du bas) et la ligne 13 comme la premiere
+     * (celle du haut), or, notre programme local indexe les lignes en partant de la premiere (celle du haut)
+     * comme index 0 et la derniere ligne (celle du bas) comme index 12.
+     *
      * @param index
      * @return
      */
-    public static int reverseBoardRowIndex(int index) {
-        if(index < 0 || index > Board.SIZE - 1) throw new IndexOutOfBoundsException();
+    public static int ConvertLineIndexLocalToServer(int index) {
+        if(index < 0 || index > Board.SIZE - 1) {
+
+            System.out.printf("problem here : %d\n", index);
+            throw new IndexOutOfBoundsException();
+        }
         return Board.SIZE - index;
     }
 
     /**
      * Fait correspondre l'indexage des lignes du serveur avec celui du programme en local
+     *
+     * Le serveur considere la ligne 1 comme la derniere ligne (celle du bas) et la ligne 13 comme la premiere
+     * (celle du haut), or, notre programme local indexe les lignes en partant de la premiere (celle du haut)
+     * comme index 0 et la derniere ligne (celle du bas) comme index 12.
      * @param index
      * @return
      */
-    public static int reversedIndexForLocalBoard(int index) {
+    public static int ConvertLineIndexServerToLocal(int index) {
         if(index < 1 || index > Board.SIZE) throw new IndexOutOfBoundsException();
         return Board.SIZE - index;
     }
 
+    /**
+     * compute the opponent of the given piece
+     *
+     * @param piece
+     * @return
+     */
     public static Mark getOpponent(Mark piece){
         return switch(piece){
-            case EMPTY -> Mark.EMPTY;
-            case BLACK -> Mark.RED;
+            case EMPTY, SPECIAL, OUT -> Mark.EMPTY;
+            case BLACK, KING -> Mark.RED;
             case RED -> Mark.BLACK;
-            case KING -> Mark.RED;
-            default -> Mark.EMPTY;
         };
     }
 
+    /**
+     * Convert a int piece value into it's mark equivalence
+     *
+     * @param value
+     * @return
+     */
     public static Mark pieceValueAsMark(int value){
         return switch(value){
             case 0 -> Mark.EMPTY;
             case 2 -> Mark.BLACK;
             case 4 -> Mark.RED;
             case 5 -> Mark.KING;
-            default -> Mark.EMPTY;
+            default -> throw new IllegalArgumentException("invalid value");
         };
     }
 
+    /**
+     * Convert a mark into it's one-letter string representation
+     *
+     * @param value
+     * @return
+     */
     public static String pieceMarkAsString(Mark value){
+
         return switch(value){
             case EMPTY -> "-";
             case BLACK -> "B";
             case RED -> "R";
-            default -> "-";
+            case KING -> "K";
+            case SPECIAL -> "X";
+            case OUT -> "O";
+        };
+    }
+
+    /**
+     * Convet a mark into it's int value
+     *
+     * @param value
+     * @return
+     */
+    public static int pieceMarkAsInt(Mark value){
+        return switch(value){
+            case EMPTY, SPECIAL -> 0;
+            case BLACK -> 2;
+            case RED -> 4;
+            case KING -> 5;
+            case OUT -> -1;
+        };
+    }
+
+    public static String pieceValueAsString(int value) {
+        return pieceMarkAsString(pieceValueAsMark(value));
+    }
+
+    public static String watchSideAsString(SubBoard.WatchMode mode) {
+        return switch(mode) {
+            case FULL -> "FULL";
+            case HORIZONTAL ->  "HORIZONTAL";
+            case VERTICAL ->  "VERTICAL";
         };
     }
 }

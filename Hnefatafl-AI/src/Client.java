@@ -1,11 +1,13 @@
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
-
+import java.util.Random;
 
 class Client {
 
     public static String IP_ADDRESS = "localhost";
+    private final boolean MANUAL_MODE = false;
+    private final int DEPTH = 2;
 
     public static void main(String[] args) {
         Client cl = new Client();
@@ -22,19 +24,20 @@ class Client {
 
     private void run() {
 
-        Socket MyClient;
         BufferedInputStream input;
         BufferedOutputStream output;
 
+        boolean running = true;
 
-        try {
-            MyClient = new Socket(IP_ADDRESS, 8888);
+        try(Socket MyClient = new Socket(IP_ADDRESS, 8888)) {
             input    = new BufferedInputStream(MyClient.getInputStream());
             output   = new BufferedOutputStream(MyClient.getOutputStream());
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
 
-            while (true) {
+            while (running) {
                 char cmd = (char) input.read();
+
+                System.out.printf("received request type : %s\n", cmd);
 
                 switch (cmd) {
                     case '1':
@@ -51,37 +54,104 @@ class Client {
                         break;
                     case '5':
                         gameHasEnded(input, output, console);
+                        //running = false;
                         break;
                 }
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             System.out.println(e);
         }
     }
 
     private void startAsRed(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("Starting as attackers (red team) : \n");
+        String s = getStringFromInputStream(input, 350);
+        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
+
+        board = new Board(s);
+        System.out.println(board);
+
+        cpu = new CPUPlayer(Mark.RED);
+
+        computeAndSendMove(output, console);
+
+        System.out.println(board);
     }
 
     private void startAsBlack(BufferedInputStream input) throws IOException {
-        // TODO 
+        System.out.println("Starting as defenders (black & king team) : \n");
+        String s = getStringFromInputStream(input, 350);
+        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
+
+        board = new Board(s);
+        System.out.println(board);
+
+        cpu = new CPUPlayer(Mark.BLACK);
     }
 
     private void playMove(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("waiting for your turn...\n");
+        String m = getStringFromInputStream(input, 16);
+        System.out.printf("Received move representation string : %s\n\n", m);
+
+        if(Move.getMoveMatcherOrNull(m) == null) {
+            System.out.println("invalid move received (we have to play the first move as red team) :");
+        } else {
+            board.play(new Move(m));
+            System.out.println(board);
+        }
+
+        computeAndSendMove(output, console);
+
+        System.out.println(board);
     }
 
     private void invalidMove(BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        throw new IllegalArgumentException("invalid Move");
     }
 
     private void gameHasEnded(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        // TODO 
+        System.out.println("End of the game.\nResult : \n");
+
+        if(board.isKingCaptured()) {
+            System.out.println("RED team won");
+        } else if(board.isKingEscaped()) {
+            System.out.println("BLACK team won");
+        } else {
+            System.out.println("game is a draw");
+        }
     }
 
     /** Demande un coup au CPU, l'applique sur notre board, et l'envoie au serveur. */
-    private void computeAndSendMove(BufferedOutputStream output) throws IOException {
-        // TODO 
+    private void computeAndSendMove(BufferedOutputStream output, BufferedReader console) throws IOException {
+        Move move_obj = null;
+
+        if(MANUAL_MODE) {
+            System.out.print("(MANUAL MODE ACTIVE) play a move : ");
+            String move_str = console.readLine();
+            move_obj = new Move(move_str);
+        } else {
+            ArrayList<Move> bestMoves = cpu.getNextMoveAB(board, DEPTH);
+
+            if (bestMoves == null || bestMoves.isEmpty()) {
+                throw new IllegalStateException("no best moves found, game is stuck...");
+            }
+
+            int index = new Random().nextInt(bestMoves.size());
+            move_obj = bestMoves.get(index);
+        }
+
+        output.write(move_obj.toString().getBytes(), 0, move_obj.toString().length());
+        output.flush();
+
+        System.out.printf("move played : %s\n\n",  move_obj.toString());
+        board.play(move_obj);
+    }
+
+    private static String getStringFromInputStream(BufferedInputStream in, int bufferSize) throws IOException {
+        byte[] aBuffer = new byte[bufferSize];
+        int contentSize = in.available();
+        in.read(aBuffer,0, contentSize);
+        return String.join("", new String(aBuffer).trim().split(" "));
     }
 }
