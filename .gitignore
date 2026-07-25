@@ -8,3 +8,5 @@ out/
 
 ## Project ##
 Serveur/ 
+.idea
+*.class

@@ -84,7 +84,6 @@ public class Board {
      */
     private void checkCaptures(Move move, Mark movedPiece) {
         int attackerEndRow = move.getEndRow(), attackerEndCol = move.getEndColumn();
-        Mark opponentPiece = Converter.getOpponent(movedPiece);
 
         SubBoard sub = new SubBoard(this.board, attackerEndRow, attackerEndCol);
         sub.setWatchMode(SubBoard.WatchMode.FULL);
@@ -92,13 +91,12 @@ public class Board {
         // check on the four side of the moved piece
         while(sub.hasNext()) {
             Mark piece = sub.next();
-            String pieceAsStr = Converter.pieceMarkAsString(piece);
             int[] direction = sub.getCurrentOrientation();
             int dirRow = direction[0], dirCol = direction[1];
 
-            if(piece == opponentPiece){
+            if (Board.isOpponent(movedPiece, piece)) {
                 int targetAbsPosRow = attackerEndRow + dirRow, targetAbsPosCol = attackerEndCol + dirCol;
-                System.out.printf("opponent absolute position : (%d, %d)\n\n", targetAbsPosRow, targetAbsPosCol);
+                //System.out.printf("opponent absolute position : (%d, %d)\n\n", targetAbsPosRow, targetAbsPosCol);
 
                 if(this.isCaptured(
                         targetAbsPosRow, targetAbsPosCol, dirRow, dirCol))
@@ -114,11 +112,11 @@ public class Board {
     public static boolean isCorner(int row, int col) { return (row == 0 || row == SIZE - 1) && (col == 0 || col == SIZE - 1); }
 
     private boolean isCaptured(int targetRow, int targetCol, int targetRowDirFromAtk, int targetColDirFromAtk) {
-        System.out.printf("attacking (%d, %d)\n", targetRow, targetCol);
+        //System.out.printf("attacking (%d, %d)\n", targetRow, targetCol);
         SubBoard sub = new SubBoard(this.board, targetRow, targetCol);
 
         int[] side = {targetRowDirFromAtk + 1, targetColDirFromAtk + 1};
-        System.out.printf("target's side : (%d, %d)\n\n", side[0], side[1]);
+        //System.out.printf("target's side : (%d, %d)\n\n", side[0], side[1]);
 
         SubBoard.WatchMode watchmode = SubBoard.isVertical(side) ?
                 SubBoard.WatchMode.VERTICAL :
@@ -359,7 +357,7 @@ class SubBoard implements Iterator<Mark> {
 
         switch(attakedPiece) {
             case KING -> {
-                System.out.println("Checking for king capture...\n");
+                //System.out.println("Checking for king capture...\n");
                 for(int[] danger : fullWatchSides) {
                     if(
                             this.get(danger[0], danger[1]) != Mark.RED
@@ -374,7 +372,7 @@ class SubBoard implements Iterator<Mark> {
                 switch(watchMode) {
                     case FULL -> { return false; } // normal piece are not compatible with a full capture
                     case VERTICAL -> {
-                        System.out.printf("Checking for %s vertical capture...\n\n", Converter.pieceMarkAsString(attakedPiece));
+                        //System.out.printf("Checking for %s vertical capture...\n\n", Converter.pieceMarkAsString(attakedPiece));
                         for(int[] danger : verticalSides) {
                             if(
                                     !Board.isOpponent(this.get(danger[0], danger[1]), attakedPiece)
@@ -382,11 +380,11 @@ class SubBoard implements Iterator<Mark> {
                                     && !Board.isThrone(this.initialRow + danger[0] - 1, this.initialCol + danger[1] - 1)
                             ) return false;
                         }
-                        System.out.printf("%s is verticaly captured...\n\n", Converter.pieceMarkAsString(attakedPiece));
+                        //System.out.printf("%s is verticaly captured...\n\n", Converter.pieceMarkAsString(attakedPiece));
                         return true;
                     }
                     case HORIZONTAL -> {
-                        System.out.printf("Checking for %s horizontal capture...\n\n", Converter.pieceMarkAsString(attakedPiece));
+                        //System.out.printf("Checking for %s horizontal capture...\n\n", Converter.pieceMarkAsString(attakedPiece));
                         for(int[] danger : horizontalSides) {
                             if(
                                     !Board.isOpponent(this.get(danger[0], danger[1]), attakedPiece)
@@ -394,7 +392,7 @@ class SubBoard implements Iterator<Mark> {
                                     && !Board.isThrone(this.initialRow + danger[0] - 1, this.initialCol + danger[1] - 1)
                             ) return false;
                         }
-                        System.out.printf("%s is horizontaly captured...\n\n", Converter.pieceMarkAsString(attakedPiece));
+                        //System.out.printf("%s is horizontaly captured...\n\n", Converter.pieceMarkAsString(attakedPiece));
                         return true;
                     }
                 };
