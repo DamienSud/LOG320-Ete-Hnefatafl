@@ -44,6 +44,7 @@ public class HeuristicEvaluator implements BoardEvaluator {
     private static final int RED_ON_KING_LINE_WEIGHT = 120;
     private static final int BLACK_GUARD_WEIGHT = 1_800;
     private static final int THREATENED_GUARD_WEIGHT = 3_500;
+    private static final int KING_GUARD_FORTRESS_WEIGHT = 12_000;
     private static final int THREATENED_RED_WEIGHT = 2_000;
 
     private static final int[][] DIRECTIONS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
@@ -90,10 +91,21 @@ public class HeuristicEvaluator implements BoardEvaluator {
              * guard that red must sandwich first. Reward it for defenders, but make
              * a guard that red can capture next move strongly favourable to red.
              */
-            defenderPositionScore += countBlackGuardsAroundKing(board, kr, kc)
-                    * BLACK_GUARD_WEIGHT;
-            defenderPositionScore -= countThreatenedKingGuards(board, kr, kc)
-                    * THREATENED_GUARD_WEIGHT;
+            int guards = countBlackGuardsAroundKing(board, kr, kc);
+            defenderPositionScore += guards * BLACK_GUARD_WEIGHT;
+
+            if (hostile >= 3 && guards > 0) {
+                /*
+                 * Three red sides plus one black guard is a fortress, not a mating
+                 * net: capturing the guard leaves an empty square and the king moves
+                 * into it before red can close it. Red must remove guards while the
+                 * king still has another exit, then build the final sides.
+                 */
+                defenderPositionScore += guards * KING_GUARD_FORTRESS_WEIGHT;
+            } else {
+                defenderPositionScore -= countThreatenedKingGuards(board, kr, kc)
+                        * THREATENED_GUARD_WEIGHT;
+            }
         }
 
         if (player == Mark.RED) {

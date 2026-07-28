@@ -8,6 +8,7 @@ public class CPUPlayer {
     private static final int TIME_CHECK_MASK = 255;
     private static final long MIN_TIME_FOR_NEXT_DEPTH_NS = 100_000_000L;
     private static final int REPETITION_PENALTY = 200_000;
+    private static final int IMMEDIATE_REVERSAL_PENALTY = 25_000;
     private static final int[][] DIRECTIONS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
     private static class SearchTimeout extends RuntimeException {
@@ -25,6 +26,7 @@ public class CPUPlayer {
     private int lastCompletedDepth;
     private int lastRootScore;
     private Set<String> seenPositions;
+    private Move lastPlayedMove;
 
     public CPUPlayer(Mark cpu) {
         this.numExploredNodes = 0;
@@ -117,6 +119,7 @@ public class CPUPlayer {
             }
             bestMove = legal.get(0);
         }
+        lastPlayedMove = bestMove;
         return bestMove;
     }
 
@@ -139,6 +142,9 @@ public class CPUPlayer {
             if (wouldRepeatRootPosition(boardCopy)) {
                 score -= REPETITION_PENALTY;
             }
+            if (isImmediateReverse(move)) {
+                score -= IMMEDIATE_REVERSAL_PENALTY;
+            }
 
             if (bestMove == null || score > bestScore) {
                 bestScore = score;
@@ -149,6 +155,14 @@ public class CPUPlayer {
 
         lastRootScore = bestScore;
         return bestMove;
+    }
+
+    private boolean isImmediateReverse(Move move) {
+        return lastPlayedMove != null
+                && move.getStartRow() == lastPlayedMove.getEndRow()
+                && move.getStartColumn() == lastPlayedMove.getEndColumn()
+                && move.getEndRow() == lastPlayedMove.getStartRow()
+                && move.getEndColumn() == lastPlayedMove.getStartColumn();
     }
 
     private boolean wouldRepeatRootPosition(Board boardAfterMove) {
