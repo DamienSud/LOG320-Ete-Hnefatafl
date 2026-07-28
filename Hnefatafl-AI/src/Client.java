@@ -1,13 +1,15 @@
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Random;
+import java.util.HashSet;
+import java.util.Set;
 
 class Client {
 
     public static String IP_ADDRESS = "localhost";
     private final boolean MANUAL_MODE = false;
-    private final int DEPTH = 2;
+    /** Le serveur accorde 5 s; cette marge couvre l'envoi réseau et la JVM. */
+    private static final long MOVE_LIMIT_MS = 5_000;
+    private static final long SEARCH_MARGIN_MS = 500;
 
     public static void main(String[] args) {
         Client cl = new Client();
@@ -16,6 +18,7 @@ class Client {
 
     private Board board;
     private CPUPlayer cpu;
+    private final Set<String> seenPositions = new HashSet<>();
 
     private Client() {
         this.board = new Board();
@@ -69,6 +72,8 @@ class Client {
         System.out.printf("Received board (as a one line string): \n%s\n\n", s);
 
         board = new Board(s);
+        seenPositions.clear();
+        recordCurrentPosition();
         System.out.println(board);
 
         cpu = new CPUPlayer(Mark.RED);
@@ -84,6 +89,8 @@ class Client {
         System.out.printf("Received board (as a one line string): \n%s\n\n", s);
 
         board = new Board(s);
+        seenPositions.clear();
+        recordCurrentPosition();
         System.out.println(board);
 
         cpu = new CPUPlayer(Mark.BLACK);
@@ -98,6 +105,7 @@ class Client {
             System.out.println("invalid move received (we have to play the first move as red team) :");
         } else {
             board.play(new Move(m));
+            recordCurrentPosition();
             System.out.println(board);
         }
 
@@ -131,14 +139,14 @@ class Client {
             String move_str = console.readLine();
             move_obj = new Move(move_str);
         } else {
-            ArrayList<Move> bestMoves = cpu.getNextMoveAB(board, DEPTH);
-
-            if (bestMoves == null || bestMoves.isEmpty()) {
-                throw new IllegalStateException("no best moves found, game is stuck...");
-            }
-
-            int index = new Random().nextInt(bestMoves.size());
-            move_obj = bestMoves.get(index);
+            long start = System.nanoTime();
+            move_obj = cpu.getBestMoveWithinMillis(
+                    board, MOVE_LIMIT_MS - SEARCH_MARGIN_MS, seenPositions);
+            long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
+            System.out.printf("search: depth %d, nodes %d, time %d ms%n",
+                    cpu.getLastCompletedDepth(),
+                    cpu.getNumOfExploredNodes(),
+                    elapsedMs);
         }
 
         output.write(move_obj.toString().getBytes(), 0, move_obj.toString().length());
@@ -146,6 +154,11 @@ class Client {
 
         System.out.printf("move played : %s\n\n",  move_obj.toString());
         board.play(move_obj);
+        recordCurrentPosition();
+    }
+
+    private void recordCurrentPosition() {
+        seenPositions.add(board.getBoardAsOneLineString("int"));
     }
 
     private static String getStringFromInputStream(BufferedInputStream in, int bufferSize) throws IOException {
