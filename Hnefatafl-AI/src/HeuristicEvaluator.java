@@ -25,13 +25,13 @@ public class HeuristicEvaluator implements BoardEvaluator {
      * a red loss now costs 1000 points: speculative positioning can no longer hide
      * several sacrificed attackers.
      */
-    private static final int DEFENDER_BLACK_PIECE_VALUE = 2_000;
+    private static int DEFENDER_BLACK_PIECE_VALUE = 3_000; // final 2000
     private static final int DEFENDER_RED_PIECE_VALUE = 1_000;
     /*
      * Red needs several coordinated pieces to capture the king. Losing one attacker
      * is therefore more serious than failing to capture one ordinary defender.
      */
-    private static final int ATTACKER_RED_PIECE_VALUE = 3_000;
+    private static int ATTACKER_RED_PIECE_VALUE = 5_000; // final 3000
     private static final int ATTACKER_BLACK_PIECE_VALUE = 1_000;
     private static final int ONE_MOVE_ESCAPE_BONUS = 50_000;
     private static final int TWO_MOVE_ESCAPE_BONUS = 8_000;
@@ -51,6 +51,14 @@ public class HeuristicEvaluator implements BoardEvaluator {
 
     @Override
     public int evaluate(Board board, Mark player) {
+        if(player == Mark.BLACK || player == Mark.KING) {
+            DEFENDER_BLACK_PIECE_VALUE = 2000;
+            ATTACKER_RED_PIECE_VALUE = 3000;
+        } else {
+            DEFENDER_BLACK_PIECE_VALUE = 3000;
+            ATTACKER_RED_PIECE_VALUE = 5000;
+        }
+
         if (board.isKingEscaped()) {
             return scoreFor(player, true);
         }
