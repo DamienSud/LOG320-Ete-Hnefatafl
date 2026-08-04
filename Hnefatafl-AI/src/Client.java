@@ -40,8 +40,6 @@ class Client {
             while (running) {
                 char cmd = (char) input.read();
 
-                System.out.printf("received request type : %s\n", cmd);
-
                 switch (cmd) {
                     case '1':
                         startAsRed(input, output, console);
@@ -62,56 +60,41 @@ class Client {
                 }
             }
         } catch (IOException e) {
-            System.out.println(e);
+            throw new UncheckedIOException(e);
         }
     }
 
     private void startAsRed(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        System.out.println("Starting as attackers (red team) : \n");
         String s = getStringFromInputStream(input, 350);
-        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
 
         board = new Board(s);
         seenPositions.clear();
         recordCurrentPosition();
-        System.out.println(board);
 
         cpu = new CPUPlayer(Mark.RED);
 
         computeAndSendMove(output, console);
-
-        System.out.println(board);
     }
 
     private void startAsBlack(BufferedInputStream input) throws IOException {
-        System.out.println("Starting as defenders (black & king team) : \n");
         String s = getStringFromInputStream(input, 350);
-        System.out.printf("Received board (as a one line string): \n%s\n\n", s);
 
         board = new Board(s);
         seenPositions.clear();
         recordCurrentPosition();
-        System.out.println(board);
 
         cpu = new CPUPlayer(Mark.BLACK);
     }
 
     private void playMove(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        System.out.println("waiting for your turn...\n");
         String m = getStringFromInputStream(input, 16);
-        System.out.printf("Received move representation string : %s\n\n", m);
 
-        if(Move.getMoveMatcherOrNull(m) == null) {
-            System.out.println("invalid move received (we have to play the first move as red team) :");
-        } else {
+        if(Move.getMoveMatcherOrNull(m) != null) {
             board.play(new Move(m));
             recordCurrentPosition();
-            System.out.println(board);
         }
 
         computeAndSendMove(output, console);
-
-        System.out.println(board);
     }
 
     private void invalidMove(BufferedOutputStream output, BufferedReader console) throws IOException {
@@ -119,15 +102,6 @@ class Client {
     }
 
     private void gameHasEnded(BufferedInputStream input, BufferedOutputStream output, BufferedReader console) throws IOException {
-        System.out.println("End of the game.\nResult : \n");
-
-        if(board.isKingCaptured()) {
-            System.out.println("RED team won");
-        } else if(board.isKingEscaped()) {
-            System.out.println("BLACK team won");
-        } else {
-            System.out.println("game is a draw");
-        }
     }
 
     /** Demande un coup au CPU, l'applique sur notre board, et l'envoie au serveur. */
@@ -135,24 +109,16 @@ class Client {
         Move move_obj = null;
 
         if(MANUAL_MODE) {
-            System.out.print("(MANUAL MODE ACTIVE) play a move : ");
             String move_str = console.readLine();
             move_obj = new Move(move_str);
         } else {
-            long start = System.nanoTime();
             move_obj = cpu.getBestMoveWithinMillis(
                     board, MOVE_LIMIT_MS - SEARCH_MARGIN_MS, seenPositions);
-            long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
-            System.out.printf("search: depth %d, nodes %d, time %d ms%n",
-                    cpu.getLastCompletedDepth(),
-                    cpu.getNumOfExploredNodes(),
-                    elapsedMs);
         }
 
         output.write(move_obj.toString().getBytes(), 0, move_obj.toString().length());
         output.flush();
 
-        System.out.printf("move played : %s\n\n",  move_obj.toString());
         board.play(move_obj);
         recordCurrentPosition();
     }

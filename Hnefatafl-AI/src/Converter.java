@@ -61,8 +61,6 @@ public class Converter {
      */
     public static int ConvertLineIndexLocalToServer(int index) {
         if(index < 0 || index > Board.SIZE - 1) {
-
-            System.out.printf("problem here : %d\n", index);
             throw new IndexOutOfBoundsException();
         }
         return Board.SIZE - index;
