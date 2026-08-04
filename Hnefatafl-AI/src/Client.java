@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.HashSet;
+import java.util.Scanner;
 import java.util.Set;
 
 class Client {
@@ -9,6 +10,8 @@ class Client {
     private static final boolean DEBUG_EVAL = true;
 
     public static String IP_ADDRESS = "localhost";
+    public static int PORT = 8888;
+
     private final boolean MANUAL_MODE = false;
     /** Le serveur accorde 5 s; cette marge couvre l'envoi réseau et la JVM. */
     private static final long MOVE_LIMIT_MS = 5_000;
@@ -35,7 +38,18 @@ class Client {
 
         boolean running = true;
 
-        try(Socket MyClient = new Socket(IP_ADDRESS, 8888)) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Entrez une adresse IP : ");
+        String ip = scanner.nextLine();
+
+        scanner = new Scanner(System.in);
+
+        System.out.print("Entrez un port : ");
+        String portInput = scanner.nextLine();
+        int port = Integer.parseInt(portInput);
+
+        try(Socket MyClient = new Socket(ip, port)) {
             input    = new BufferedInputStream(MyClient.getInputStream());
             output   = new BufferedOutputStream(MyClient.getOutputStream());
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
