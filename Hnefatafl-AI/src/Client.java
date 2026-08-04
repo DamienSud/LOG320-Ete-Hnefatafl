@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.*;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Scanner;
 
 class Client {
 
@@ -32,7 +33,18 @@ class Client {
 
         boolean running = true;
 
-        try(Socket MyClient = new Socket(IP_ADDRESS, 8888)) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Entrez une adresse IP : ");
+        String ip = scanner.nextLine();
+
+        scanner = new Scanner(System.in);
+
+        System.out.print("Entrez un port : ");
+        String portInput = scanner.nextLine();
+        int port = Integer.parseInt(portInput);
+
+        try(Socket MyClient = new Socket(ip, port)) {
             input    = new BufferedInputStream(MyClient.getInputStream());
             output   = new BufferedOutputStream(MyClient.getOutputStream());
             BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
@@ -56,7 +68,7 @@ class Client {
                     case '5':
                         gameHasEnded(input, output, console);
                         //running = false;
-                        break;
+                        while (true);
                 }
             }
         } catch (IOException e) {
