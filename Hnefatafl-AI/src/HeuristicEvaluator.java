@@ -32,13 +32,16 @@ public class HeuristicEvaluator implements BoardEvaluator {
     private static final int BLACK_PIECE_VALUE = 2_000;
 
     /** Poids de la progression du roi vers un coin, par case gagnée. */
-    private static final int KING_PROGRESS_WEIGHT = 600;
+    private static final int KING_PROGRESS_WEIGHT = 2_500;
 
     /** Bonus par route libre roi -> coin. Non linéaire : deux routes sont imparables. */
     private static final int KING_OPEN_PATH_BONUS = 30_000;
 
     /** Pénalité par côté du roi déjà hostile, pour les noirs. */
     private static final int KING_ENCIRCLEMENT_WEIGHT = 4_000;
+
+    /** Pénalité par pion capturable au coup suivant, symétrique. */
+    private static final int HANGING_PENALTY = 1_500;
 
     private static final int[][] DIRECTIONS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
@@ -75,7 +78,74 @@ public class HeuristicEvaluator implements BoardEvaluator {
         return materialBalance(board)
                 + kingProgress(king)
                 + kingOpenPaths(board, king)
-                - kingEncirclement(board, king);
+                - kingEncirclement(board, king)
+                + hangingBalance(board);
+    }
+
+    /**
+     * Solde des pions capturables au coup suivant, positif si les noirs sont
+     * mieux placés.
+     *
+     * <p>Corrige les avances suicidaires : sans ce terme, se coller au roi
+     * rapporte plus en encerclement que le pion ne coûte en matériel.
+     */
+    private int hangingBalance(Board board) {
+        int redHanging = 0;
+        int blackHanging = 0;
+
+        for (int row = 0; row < Board.SIZE; row++) {
+            for (int col = 0; col < Board.SIZE; col++) {
+                Mark cell = board.getCell(row, col);
+                if (cell != Mark.RED && cell != Mark.BLACK) {
+                    continue;
+                }
+                if (isCapturable(board, row, col, cell)) {
+                    if (cell == Mark.RED) {
+                        redHanging++;
+                    } else {
+                        blackHanging++;
+                    }
+                }
+            }
+        }
+        return (redHanging - blackHanging) * HANGING_PENALTY;
+    }
+
+    /**
+     * Vrai si le pion peut être pris par sandwich sur au moins un axe : un
+     * preneur d'un côté, une case libre de l'autre.
+     *
+     * <p>Approximation assumée : on ne vérifie pas qu'un ennemi atteint
+     * effectivement la case libre. Le coût exact ne se justifie pas dans une
+     * fonction appelée des millions de fois.
+     */
+    private boolean isCapturable(Board board, int row, int col, Mark piece) {
+        for (int axis = 0; axis < 2; axis++) {
+            int dr = (axis == 0) ? 1 : 0;
+            int dc = (axis == 0) ? 0 : 1;
+
+            boolean captorBefore = isCaptor(board, row - dr, col - dc, piece);
+            boolean captorAfter = isCaptor(board, row + dr, col + dc, piece);
+            boolean freeBefore = board.getCell(row - dr, col - dc) == Mark.EMPTY;
+            boolean freeAfter = board.getCell(row + dr, col + dc) == Mark.EMPTY;
+
+            if ((captorBefore && freeAfter) || (captorAfter && freeBefore)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Vrai si cette case agit comme preneur contre {@code piece}. */
+    private boolean isCaptor(Board board, int row, int col, Mark piece) {
+        Mark cell = board.getCell(row, col);
+        if (cell == Mark.SPECIAL) {
+            return true;
+        }
+        if (piece == Mark.RED) {
+            return cell == Mark.BLACK || cell == Mark.KING;
+        }
+        return cell == Mark.RED;
     }
 
     /* ------------------------------------------------------------------ */
@@ -236,13 +306,14 @@ public class HeuristicEvaluator implements BoardEvaluator {
         int progress = kingProgress(king);
         int paths = kingOpenPaths(board, king);
         int encirclement = kingEncirclement(board, king);
-        int totalForBlack = material + progress + paths - encirclement;
+        int hanging = hangingBalance(board);
+        int totalForBlack = material + progress + paths - encirclement + hanging;
 
         return String.format(
                 "roi=(%d,%d) | materiel=%+d progression=%+d routes=%+d encerclement=%+d"
-                        + " | total(noirs)=%+d total(%s)=%+d",
+                        + " | total(noirs)=%+d total(%s)=%+d" + " enPrise=%+d",
                 king[0], king[1],
                 material, progress, paths, -encirclement,
-                totalForBlack, player, evaluate(board, player));
+                totalForBlack, player, evaluate(board, player), hanging);
     }
 }

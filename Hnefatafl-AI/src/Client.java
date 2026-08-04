@@ -60,8 +60,9 @@ class Client {
                         break;
                     case '5':
                         gameHasEnded(input, output, console);
-                        //running = false;
-                        break;
+
+                        // avoid crash at the end of the game
+                        while(true);
                 }
             }
         } catch (IOException e) {
