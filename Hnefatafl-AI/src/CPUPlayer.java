@@ -101,6 +101,9 @@ public class CPUPlayer {
 
                 bestMove = result;
                 lastCompletedDepth = depth;
+                System.out.printf(
+                        "profondeur=%d score=%+d noeuds=%d%n",
+                        depth, lastRootScore, numExploredNodes);
                 if (Math.abs(lastRootScore) >= HeuristicEvaluator.WIN_SCORE) {
                     break;
                 }
@@ -182,7 +185,11 @@ public class CPUPlayer {
          * ici, avant de générer des descendants d'une partie déjà terminée.
          */
         if (board.isKingEscaped() || board.isKingCaptured()) {
-            return board.evaluate(maxPlayer);
+            int raw = board.evaluate(maxPlayer);
+            // Une victoire proche vaut mieux qu'une victoire lointaine, et une
+            // défaite lointaine mieux qu'une défaite immédiate. Sans ce biais,
+            // la recherche temporise au lieu de conclure.
+            return raw > 0 ? raw + depth : raw - depth;
         }
         if (depth <= 0) {
             return board.evaluate(maxPlayer);

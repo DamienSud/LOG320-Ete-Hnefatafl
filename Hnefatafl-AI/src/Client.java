@@ -5,6 +5,9 @@ import java.util.Set;
 
 class Client {
 
+    /** Trace la décomposition de l'évaluation après chaque coup joué. */
+    private static final boolean DEBUG_EVAL = true;
+
     public static String IP_ADDRESS = "localhost";
     private final boolean MANUAL_MODE = false;
     /** Le serveur accorde 5 s; cette marge couvre l'envoi réseau et la JVM. */
@@ -154,6 +157,7 @@ class Client {
 
         System.out.printf("move played : %s\n\n",  move_obj.toString());
         board.play(move_obj);
+        if (DEBUG_EVAL)  System.out.println(new HeuristicEvaluator().explain(board, cpu.getMaxPlayer()));
         recordCurrentPosition();
     }
 

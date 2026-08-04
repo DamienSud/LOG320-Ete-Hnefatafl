@@ -1,160 +1,202 @@
+/**
+ * Évaluation statique d'une position de Hnefatafl 13x13.
+ *
+ * <p>Contrat : le score retourné est toujours exprimé du point de vue du
+ * joueur passé en paramètre. Un score positif est favorable à ce joueur.
+ *
+ * <p>Cette classe est sans état : une instance est allouée par {@link Board}
+ * à chaque copie de plateau, l'absence de champ rend ce coût négligeable.
+ *
+ * <p>Règles encodées :
+ * <ul>
+ *   <li>Les noirs (défenseurs, 12 pions + roi) gagnent si le roi atteint
+ *       l'un des 4 coins.</li>
+ *   <li>Les rouges (attaquants, 24 pions) gagnent si le roi est entouré
+ *       de 4 cases hostiles (pion rouge, bord de plateau, trône ou coin).</li>
+ * </ul>
+ */
 public class HeuristicEvaluator implements BoardEvaluator {
 
+    /** Score d'une position gagnée. Doit rester très au-dessus des termes positionnels. */
     public static final int WIN_SCORE = 1_000_000;
 
+    /* --- Poids des termes. Un seul endroit à toucher pour le réglage. --- */
+
+    /** Valeur d'un pion rouge pour les rouges. */
+    private static final int RED_PIECE_VALUE = 1_000;
+
     /**
-     * Positional strategy expressed from the defenders' point of view. The
-     * positional part is flipped for red, but material is evaluated separately:
-     * attackers must preserve enough pieces to finish the four-sided capture.
-     *
-     * 1) Material — blacks count a bit more (12 vs 24 at start).
-     * 2) Escape — ray cast in 4 directions (same slides as the king); bonus if a
-     *    ray hits a corner or the edge then a corner.
-     * 3) Open corner count — how many corners are one clear slide away.
-     * 4) King surround — hostile neighbours (red, throne, corner, off-board).
-     * 5) Open sides — empty/black cells beside the king (capture not finished).
-     * 6) Red lane blockers — reds on the king's rank/file stop rook escapes.
-     * 7) King guards — adjacent black pieces must be removed before closing the net.
-     * 8) Hanging attackers — reds capturable by black on the next move.
-     *
-     * All of (3–7) help red when the positional score is negated.
+     * Valeur d'un pion noir pour les noirs. Supérieure à celle d'un rouge :
+     * avec un ratio 24 contre 12, un échange 1 pour 1 favorise les rouges.
      */
-    /*
-     * Defenders start with 12 pieces and attackers with 24. Giving a black piece
-     * twice the value keeps the initial material score neutral. More importantly,
-     * a red loss now costs 1000 points: speculative positioning can no longer hide
-     * several sacrificed attackers.
-     */
-    private static int DEFENDER_BLACK_PIECE_VALUE = 3_000; // final 2000
-    private static final int DEFENDER_RED_PIECE_VALUE = 1_000;
-    /*
-     * Red needs several coordinated pieces to capture the king. Losing one attacker
-     * is therefore more serious than failing to capture one ordinary defender.
-     */
-    private static int ATTACKER_RED_PIECE_VALUE = 5_000; // final 3000
-    private static final int ATTACKER_BLACK_PIECE_VALUE = 1_000;
-    private static final int ONE_MOVE_ESCAPE_BONUS = 50_000;
-    private static final int TWO_MOVE_ESCAPE_BONUS = 8_000;
-    private static final int REACH_STEP_WEIGHT = 40;
-    private static final int OPEN_CORNER_RAY_WEIGHT = 3_000;
-    private static final int KING_SURROUND_WEIGHT = 300;
-    private static final int KING_NET_ESTABLISHED = 1_000;
-    private static final int KING_ALMOST_CAPTURED = 4_000;
-    private static final int OPEN_SIDE_WEIGHT = 400;
-    private static final int RED_ON_KING_LINE_WEIGHT = 120;
-    private static final int BLACK_GUARD_WEIGHT = 1_800;
-    private static final int THREATENED_GUARD_WEIGHT = 3_500;
-    private static final int KING_GUARD_FORTRESS_WEIGHT = 12_000;
-    private static final int THREATENED_RED_WEIGHT = 2_000;
+    private static final int BLACK_PIECE_VALUE = 2_000;
+
+    /** Poids de la progression du roi vers un coin, par case gagnée. */
+    private static final int KING_PROGRESS_WEIGHT = 600;
+
+    /** Bonus par route libre roi -> coin. Non linéaire : deux routes sont imparables. */
+    private static final int KING_OPEN_PATH_BONUS = 30_000;
+
+    /** Pénalité par côté du roi déjà hostile, pour les noirs. */
+    private static final int KING_ENCIRCLEMENT_WEIGHT = 4_000;
 
     private static final int[][] DIRECTIONS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
+    private static final int[][] CORNERS = {
+            {0, 0}, {0, Board.SIZE - 1}, {Board.SIZE - 1, 0}, {Board.SIZE - 1, Board.SIZE - 1}
+    };
+
     @Override
     public int evaluate(Board board, Mark player) {
-        if(player == Mark.BLACK || player == Mark.KING) {
-            DEFENDER_BLACK_PIECE_VALUE = 2000;
-            ATTACKER_RED_PIECE_VALUE = 3000;
-        } else {
-            DEFENDER_BLACK_PIECE_VALUE = 3000;
-            ATTACKER_RED_PIECE_VALUE = 5000;
-        }
+        int scoreForBlack = evaluateForBlack(board);
+        return isBlackSide(player) ? scoreForBlack : -scoreForBlack;
+    }
 
+    /**
+     * Cœur de l'évaluation, exprimé une seule fois du point de vue des noirs.
+     *
+     * <p>Un unique point de vue interne garantit l'antisymétrie du score, qui
+     * est une précondition de correction du minimax : sans elle, un même
+     * plateau peut être jugé bon pour les deux camps simultanément.
+     */
+    private int evaluateForBlack(Board board) {
         if (board.isKingEscaped()) {
-            return scoreFor(player, true);
+            return WIN_SCORE;
         }
         if (board.isKingCaptured()) {
-            return scoreFor(player, false);
+            return -WIN_SCORE;
         }
 
-        int defenderPositionScore = 0;
         int[] king = findKing(board);
-        if (king != null) {
-            int kr = king[0], kc = king[1];
-            int last = Board.SIZE - 1;
-
-            defenderPositionScore += escapeThreatScore(board, kr, kc, last);
-            defenderPositionScore += countOpenCornerRays(board, kr, kc)
-                    * OPEN_CORNER_RAY_WEIGHT;
-
-            int hostile = countHostileAroundKing(board, kr, kc);
-            defenderPositionScore -= hostile * KING_SURROUND_WEIGHT;
-            if (hostile >= 2) {
-                defenderPositionScore -= KING_NET_ESTABLISHED;
-            }
-            if (hostile >= 3) {
-                defenderPositionScore -= KING_ALMOST_CAPTURED;
-            }
-
-            /*
-             * Open sides help the defender, so this term must be positive in the
-             * defender score. The previous '-' made red prefer leaving the king open.
-             */
-            defenderPositionScore += countOpenSidesAroundKing(board, kr, kc)
-                    * OPEN_SIDE_WEIGHT;
-            defenderPositionScore -= countRedsOnKingLines(board, kr, kc)
-                    * RED_ON_KING_LINE_WEIGHT;
-
-            /*
-             * A black piece beside the king is not merely an "open side": it is a
-             * guard that red must sandwich first. Reward it for defenders, but make
-             * a guard that red can capture next move strongly favourable to red.
-             */
-            int guards = countBlackGuardsAroundKing(board, kr, kc);
-            defenderPositionScore += guards * BLACK_GUARD_WEIGHT;
-
-            if (hostile >= 3 && guards > 0) {
-                /*
-                 * Three red sides plus one black guard is a fortress, not a mating
-                 * net: capturing the guard leaves an empty square and the king moves
-                 * into it before red can close it. Red must remove guards while the
-                 * king still has another exit, then build the final sides.
-                 */
-                defenderPositionScore += guards * KING_GUARD_FORTRESS_WEIGHT;
-            } else {
-                defenderPositionScore -= countThreatenedKingGuards(board, kr, kc)
-                        * THREATENED_GUARD_WEIGHT;
-            }
+        if (king == null) {
+            return -WIN_SCORE; // défensif : roi absent sans capture détectée
         }
 
-        if (player == Mark.RED) {
-            /*
-             * A threatened red is still physically on the board, so material alone
-             * cannot see the coming loss at the search horizon. Penalise it now.
-             */
-            int hangingAttackers = countThreatenedReds(board);
-            return attackerMaterialScore(board)
-                    - defenderPositionScore
-                    - hangingAttackers * THREATENED_RED_WEIGHT;
-        }
-        return defenderMaterialScore(board) + defenderPositionScore;
+        return materialBalance(board)
+                + kingProgress(king)
+                + kingOpenPaths(board, king)
+                - kingEncirclement(board, king);
     }
 
-    private int defenderMaterialScore(Board board) {
-        int[] counts = countPieces(board);
-        return counts[0] * DEFENDER_BLACK_PIECE_VALUE
-                - counts[1] * DEFENDER_RED_PIECE_VALUE;
-    }
+    /* ------------------------------------------------------------------ */
+    /* Terme 1 : matériel                                                  */
+    /* ------------------------------------------------------------------ */
 
-    private int attackerMaterialScore(Board board) {
-        int[] counts = countPieces(board);
-        return counts[1] * ATTACKER_RED_PIECE_VALUE
-                - counts[0] * ATTACKER_BLACK_PIECE_VALUE;
-    }
+    /** Différence de matériel, positive si les noirs sont avantagés. */
+    private int materialBalance(Board board) {
+        int blacks = 0;
+        int reds = 0;
 
-    /** Returns {blackCount, redCount}. */
-    private int[] countPieces(Board board) {
-        int black = 0, red = 0;
         for (int row = 0; row < Board.SIZE; row++) {
             for (int col = 0; col < Board.SIZE; col++) {
-                Mark m = board.getCell(row, col);
-                if (m == Mark.BLACK) {
-                    black++;
-                } else if (m == Mark.RED) {
-                    red++;
+                Mark cell = board.getCell(row, col);
+                if (cell == Mark.BLACK) {
+                    blacks++;
+                } else if (cell == Mark.RED) {
+                    reds++;
                 }
             }
         }
-        return new int[]{black, red};
+        return blacks * BLACK_PIECE_VALUE - reds * RED_PIECE_VALUE;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Terme 2 : progression du roi                                        */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Récompense la proximité du roi au coin le plus proche, en distance de
+     * Chebyshev : le roi se déplaçant en ligne, deux coups suffisent pour
+     * couvrir un déplacement diagonal si les routes sont libres.
+     */
+    private int kingProgress(int[] king) {
+        int best = Integer.MAX_VALUE;
+        for (int[] corner : CORNERS) {
+            int distance = Math.max(
+                    Math.abs(king[0] - corner[0]),
+                    Math.abs(king[1] - corner[1]));
+            best = Math.min(best, distance);
+        }
+        return (Board.SIZE - best) * KING_PROGRESS_WEIGHT;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Terme 3 : routes libres vers un coin                                */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Compte les coins que le roi peut atteindre en un coup, puis récompense
+     * de façon quadratique.
+     *
+     * <p>La non-linéarité est délibérée : une seule route ouverte se bloque,
+     * deux routes simultanées sont une victoire forcée que la recherche doit
+     * voir même au-delà de son horizon.
+     */
+    private int kingOpenPaths(Board board, int[] king) {
+        int openPaths = 0;
+        for (int[] direction : DIRECTIONS) {
+            if (rayReachesCorner(board, king[0], king[1], direction)) {
+                openPaths++;
+            }
+        }
+        return openPaths * openPaths * KING_OPEN_PATH_BONUS;
+    }
+
+    /** Vrai si la case atteinte en glissant depuis (row, col) est un coin libre. */
+    private boolean rayReachesCorner(Board board, int row, int col, int[] direction) {
+        int r = row + direction[0];
+        int c = col + direction[1];
+
+        while (board.isInBoard(r, c)) {
+            Mark cell = board.getCell(r, c);
+            if (cell != Mark.EMPTY && cell != Mark.SPECIAL) {
+                return false; // route bloquée
+            }
+            if (Board.isCorner(r, c)) {
+                return true;
+            }
+            r += direction[0];
+            c += direction[1];
+        }
+        return false;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Terme 4 : encerclement du roi                                       */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Compte les côtés du roi déjà hostiles, pondéré de façon quadratique.
+     *
+     * <p>Une case hostile est un pion rouge, un bord de plateau ou une case
+     * spéciale. Le roi est capturé à 4 côtés hostiles, donc 3 côtés est une
+     * menace immédiate qui doit dominer tout gain matériel.
+     */
+    private int kingEncirclement(Board board, int[] king) {
+        int hostileSides = 0;
+        for (int[] direction : DIRECTIONS) {
+            if (isHostileToKing(board, king[0] + direction[0], king[1] + direction[1])) {
+                hostileSides++;
+            }
+        }
+        return hostileSides * hostileSides * KING_ENCIRCLEMENT_WEIGHT;
+    }
+
+    /** Une case compte comme hostile si elle participerait à la capture du roi. */
+    private boolean isHostileToKing(Board board, int row, int col) {
+        Mark cell = board.getCell(row, col);
+        return cell == Mark.RED
+                || cell == Mark.OUT
+                || cell == Mark.SPECIAL;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Utilitaires                                                         */
+    /* ------------------------------------------------------------------ */
+
+    /** Les noirs et le roi forment un seul camp du point de vue du jeu. */
+    private static boolean isBlackSide(Mark player) {
+        return player == Mark.BLACK || player == Mark.KING;
     }
 
     private int[] findKing(Board board) {
@@ -168,327 +210,39 @@ public class HeuristicEvaluator implements BoardEvaluator {
         return null;
     }
 
-    private boolean isDefender(Mark player) {
-        return player == Mark.BLACK || player == Mark.KING;
-    }
-
-    private int orientForPlayer(Mark player, int defenderScore) {
-        return isDefender(player) ? defenderScore : -defenderScore;
-    }
-
-    private int scoreFor(Mark player, boolean defenderWins) {
-        return orientForPlayer(player, defenderWins ? WIN_SCORE : -WIN_SCORE);
-    }
-
-    private int escapeThreatScore(Board board, int kingRow, int kingCol, int last) {
-        int oneMoveThreat = 0;
-        int twoMoveThreat = 0;
-        int reachPotential = 0;
-
-        for (int[] dir : DIRECTIONS) {
-            int[] far = farthestKingReach(board, kingRow, kingCol, dir[0], dir[1]);
-            reachPotential += Math.abs(far[0] - kingRow) + Math.abs(far[1] - kingCol);
-
-            if (Board.isCorner(far[0], far[1])) {
-                oneMoveThreat = Math.max(oneMoveThreat, ONE_MOVE_ESCAPE_BONUS);
-            } else if (isOnEdge(far[0], far[1], last) && edgeLeadsToCorner(board, far[0], far[1], last)) {
-                twoMoveThreat = Math.max(twoMoveThreat, TWO_MOVE_ESCAPE_BONUS);
-            }
-        }
-
-        return oneMoveThreat + twoMoveThreat + reachPotential * REACH_STEP_WEIGHT;
-    }
-
-    /** Corners reachable with one unobstructed slide from the king. */
-    private int countOpenCornerRays(Board board, int kingRow, int kingCol) {
-        int last = Board.SIZE - 1;
-        int count = 0;
-        int[][] corners = {{0, 0}, {0, last}, {last, 0}, {last, last}};
-        for (int[] corner : corners) {
-            if (canSlideToCorner(board, kingRow, kingCol, corner[0], corner[1])) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private boolean canSlideToCorner(Board board, int kingRow, int kingCol, int cornerRow, int cornerCol) {
-        if (kingRow == cornerRow && kingCol == cornerCol) {
-            return true;
-        }
-        if (kingRow == cornerRow && clearLine(board, kingRow, kingCol, kingRow, cornerCol)) {
-            return true;
-        }
-        return kingCol == cornerCol && clearLine(board, kingRow, kingCol, cornerRow, kingCol);
-    }
-
-    private boolean clearLine(Board board, int r1, int c1, int r2, int c2) {
-        if (r1 != r2 && c1 != c2) {
-            return false;
-        }
-        if (r1 == r2) {
-            int min = Math.min(c1, c2), max = Math.max(c1, c2);
-            for (int c = min + 1; c < max; c++) {
-                if (!kingCanTraverse(board, r1, c)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        int min = Math.min(r1, r2), max = Math.max(r1, r2);
-        for (int r = min + 1; r < max; r++) {
-            if (!kingCanTraverse(board, r, c1)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean kingCanTraverse(Board board, int row, int col) {
-        Mark m = board.getCell(row, col);
-        return m == Mark.EMPTY || m == Mark.SPECIAL;
-    }
-
-    private int[] farthestKingReach(Board board, int row, int col, int dRow, int dCol) {
-        int r = row, c = col;
-        while (true) {
-            int nextRow = r + dRow, nextCol = c + dCol;
-            if (!board.isInBoard(nextRow, nextCol) || !kingCanTraverse(board, nextRow, nextCol)) {
-                break;
-            }
-            r = nextRow;
-            c = nextCol;
-        }
-        return new int[]{r, c};
-    }
-
-    private boolean isOnEdge(int row, int col, int last) {
-        return row == 0 || row == last || col == 0 || col == last;
-    }
-
-    private boolean edgeLeadsToCorner(Board board, int row, int col, int last) {
-        if (Board.isCorner(row, col)) {
-            return true;
-        }
-        if (row == 0 || row == last) {
-            if (rayReachesCorner(board, row, col, 0, -1)) return true;
-            if (rayReachesCorner(board, row, col, 0, 1)) return true;
-        }
-        if (col == 0 || col == last) {
-            if (rayReachesCorner(board, row, col, -1, 0)) return true;
-            if (rayReachesCorner(board, row, col, 1, 0)) return true;
-        }
-        return false;
-    }
-
-    private boolean rayReachesCorner(Board board, int startRow, int startCol, int dRow, int dCol) {
-        int r = startRow, c = startCol;
-        while (true) {
-            int nextRow = r + dRow, nextCol = c + dCol;
-            if (!board.isInBoard(nextRow, nextCol) || !kingCanTraverse(board, nextRow, nextCol)) {
-                return false;
-            }
-            r = nextRow;
-            c = nextCol;
-            if (Board.isCorner(r, c)) {
-                return true;
-            }
-        }
-    }
-
-    private int countHostileAroundKing(Board board, int kingRow, int kingCol) {
-        int count = 0;
-        for (int[] dir : DIRECTIONS) {
-            int row = kingRow + dir[0], col = kingCol + dir[1];
-            if (!board.isInBoard(row, col)) {
-                count++;
-            } else {
-                Mark m = board.getCell(row, col);
-                /*
-                 * PDF p.3 and Board/SubBoard: throne and exit squares can help
-                 * capture the king. Both are represented by special coordinates.
-                 */
-                if (m == Mark.RED || Board.isSpecialSquare(row, col)) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    private int countOpenSidesAroundKing(Board board, int kingRow, int kingCol) {
-        int open = 0;
-        for (int[] dir : DIRECTIONS) {
-            int row = kingRow + dir[0], col = kingCol + dir[1];
-            if (!board.isInBoard(row, col)) {
-                continue;
-            }
-            Mark m = board.getCell(row, col);
-            if (m == Mark.EMPTY || m == Mark.BLACK) {
-                open++;
-            }
-        }
-        return open;
-    }
-
-    private int countBlackGuardsAroundKing(Board board, int kingRow, int kingCol) {
-        int guards = 0;
-        for (int[] dir : DIRECTIONS) {
-            int row = kingRow + dir[0], col = kingCol + dir[1];
-            if (board.isInBoard(row, col) && board.getCell(row, col) == Mark.BLACK) {
-                guards++;
-            }
-        }
-        return guards;
-    }
+    /* ------------------------------------------------------------------ */
+    /* Diagnostic                                                          */
+    /* ------------------------------------------------------------------ */
 
     /**
-     * Counts adjacent black guards that red can sandwich on its next move.
-     *
-     * Example from the observed position: the king has three hostile sides and F8
-     * is the last guard. If a red already forms the anvil and another red can slide
-     * onto the opposite empty square, this term guides minimax toward removing F8;
-     * after that, red can occupy the newly empty side and capture the king.
+     * Décomposition lisible du score, pour analyser une position litigieuse.
+     * À appeler manuellement depuis {@code Client} quand l'IA joue un coup
+     * douteux, jamais depuis la recherche.
      */
-    private int countThreatenedKingGuards(Board board, int kingRow, int kingCol) {
-        int threatened = 0;
-        for (int[] dir : DIRECTIONS) {
-            int guardRow = kingRow + dir[0], guardCol = kingCol + dir[1];
-            if (board.isInBoard(guardRow, guardCol)
-                    && board.getCell(guardRow, guardCol) == Mark.BLACK
-                    && redCanCaptureGuardNext(board, guardRow, guardCol)) {
-                threatened++;
-            }
+    public String explain(Board board, Mark player) {
+        if (board.isKingEscaped()) {
+            return "TERMINAL: roi echappe";
         }
-        return threatened;
-    }
-
-    private boolean redCanCaptureGuardNext(Board board, int guardRow, int guardCol) {
-        /*
-         * Check both orientations of each axis. "Anvil" is already red/special;
-         * "hammer" is the empty square where another red can legally slide.
-         */
-        for (int[] dir : DIRECTIONS) {
-            int anvilRow = guardRow + dir[0], anvilCol = guardCol + dir[1];
-            int hammerRow = guardRow - dir[0], hammerCol = guardCol - dir[1];
-
-            if (!isRedCaptureAnvil(board, anvilRow, anvilCol)
-                    || !board.isInBoard(hammerRow, hammerCol)
-                    || board.getCell(hammerRow, hammerCol) != Mark.EMPTY
-                    || Board.isSpecialSquare(hammerRow, hammerCol)) {
-                continue;
-            }
-
-            if (redCanSlideTo(board, hammerRow, hammerCol)) {
-                return true;
-            }
+        if (board.isKingCaptured()) {
+            return "TERMINAL: roi capture";
         }
-        return false;
-    }
 
-    private boolean isRedCaptureAnvil(Board board, int row, int col) {
-        if (!board.isInBoard(row, col)) {
-            return false;
+        int[] king = findKing(board);
+        if (king == null) {
+            return "TERMINAL: roi absent";
         }
-        Mark cell = board.getCell(row, col);
-        return cell == Mark.RED || Board.isSpecialSquare(row, col);
-    }
 
-    private boolean redCanSlideTo(Board board, int targetRow, int targetCol) {
-        for (int[] dir : DIRECTIONS) {
-            int row = targetRow + dir[0], col = targetCol + dir[1];
-            while (board.isInBoard(row, col)) {
-                Mark cell = board.getCell(row, col);
-                if (cell == Mark.RED) {
-                    return true;
-                }
-                if (cell != Mark.EMPTY && cell != Mark.SPECIAL) {
-                    break;
-                }
-                row += dir[0];
-                col += dir[1];
-            }
-        }
-        return false;
-    }
+        int material = materialBalance(board);
+        int progress = kingProgress(king);
+        int paths = kingOpenPaths(board, king);
+        int encirclement = kingEncirclement(board, king);
+        int totalForBlack = material + progress + paths - encirclement;
 
-    /** Red pieces that a black piece or the king can sandwich on its next move. */
-    private int countThreatenedReds(Board board) {
-        int threatened = 0;
-        for (int row = 0; row < Board.SIZE; row++) {
-            for (int col = 0; col < Board.SIZE; col++) {
-                if (board.getCell(row, col) == Mark.RED
-                        && defenderCanCaptureRedNext(board, row, col)) {
-                    threatened++;
-                }
-            }
-        }
-        return threatened;
-    }
-
-    private boolean defenderCanCaptureRedNext(Board board, int redRow, int redCol) {
-        for (int[] dir : DIRECTIONS) {
-            int anvilRow = redRow + dir[0], anvilCol = redCol + dir[1];
-            int hammerRow = redRow - dir[0], hammerCol = redCol - dir[1];
-
-            if (!isDefenderCaptureAnvil(board, anvilRow, anvilCol)
-                    || !board.isInBoard(hammerRow, hammerCol)
-                    || board.getCell(hammerRow, hammerCol) != Mark.EMPTY) {
-                continue;
-            }
-
-            if (defenderCanSlideTo(board, hammerRow, hammerCol)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isDefenderCaptureAnvil(Board board, int row, int col) {
-        if (!board.isInBoard(row, col)) {
-            return false;
-        }
-        Mark cell = board.getCell(row, col);
-        return cell == Mark.BLACK
-                || cell == Mark.KING
-                || Board.isSpecialSquare(row, col);
-    }
-
-    private boolean defenderCanSlideTo(Board board, int targetRow, int targetCol) {
-        for (int[] dir : DIRECTIONS) {
-            int row = targetRow + dir[0], col = targetCol + dir[1];
-            while (board.isInBoard(row, col)) {
-                Mark cell = board.getCell(row, col);
-                if (cell == Mark.BLACK || cell == Mark.KING) {
-                    return true;
-                }
-                if (cell != Mark.EMPTY && cell != Mark.SPECIAL) {
-                    break;
-                }
-                row += dir[0];
-                col += dir[1];
-            }
-        }
-        return false;
-    }
-
-    /** Reds on the same row/column as the king (block rook slides toward corners). */
-    private int countRedsOnKingLines(Board board, int kingRow, int kingCol) {
-        int count = 0;
-        for (int[] dir : DIRECTIONS) {
-            int row = kingRow + dir[0], col = kingCol + dir[1];
-            while (board.isInBoard(row, col)) {
-                if (board.getCell(row, col) == Mark.RED) {
-                    count++;
-                }
-                Mark cell = board.getCell(row, col);
-                if (cell != Mark.EMPTY && cell != Mark.SPECIAL) {
-                    break;
-                }
-                row += dir[0];
-                col += dir[1];
-            }
-        }
-        return count;
+        return String.format(
+                "roi=(%d,%d) | materiel=%+d progression=%+d routes=%+d encerclement=%+d"
+                        + " | total(noirs)=%+d total(%s)=%+d",
+                king[0], king[1],
+                material, progress, paths, -encirclement,
+                totalForBlack, player, evaluate(board, player));
     }
 }

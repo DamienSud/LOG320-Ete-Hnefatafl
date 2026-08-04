@@ -351,7 +351,6 @@ class SubBoard implements Iterator<Mark> {
         this.ref[absRow][absCol] = mark;
     }
 
-    // TODO
     public boolean isCaptured(WatchMode watchMode) {
         Mark attakedPiece = this.get(1, 1);
 
